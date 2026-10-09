@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Acceso Gym</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; }
+        .kiosco-card {
+            max-width: 450px;
+            margin: 80px auto;
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+        }
+        .status-box { display: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card kiosco-card p-4 text-center text-white shadow-lg">
+        <h2 class="mb-4 fw-bold text-primary">🏋️ Control de Acceso</h2>
+
+        <form id="formAcceso" onsubmit="procesarAcceso(event)">
+            <div class="mb-3">
+                <label for="codigoSocio" class="form-label text-slate-400">Ingresa tu Código / PIN:</label>
+                <input type="text"
+                       id="codigoSocio"
+                       class="form-control form-control-lg text-center fs-2 fw-bold bg-dark text-white border-secondary"
+                       placeholder="1001"
+                       maxlength="7"
+                       autofocus
+                       required />
+            </div>
+            <button type="submit" id="btnSubmit" class="btn btn-primary btn-lg w-100 fw-semibold">Marcar Entrada</button>
+        </form>
+
+        <!-- Contenedor dinámico para mostrar resultados -->
+        <div id="mensajeAcceso" class="alert status-box rounded-3"></div>
+    </div>
+</div>
+
+<script>
+    let temporizadorMensaje = null;
+
+    async function procesarAcceso(event) {
+        event.preventDefault();
+
+        const inputCodigo = document.getElementById("codigoSocio");
+        const btnSubmit = document.getElementById("btnSubmit"); // Asumiendo que tu botón tiene id="btnSubmit"
+        const codigoSocio = inputCodigo.value.trim();
+        const box = document.getElementById("mensajeAcceso");
+
+        if (!codigoSocio) return;
+
+        // 1. BLOQUEAR INPUT Y BOTÓN INMEDIATAMENTE
+        inputCodigo.disabled = true;
+        if (btnSubmit) btnSubmit.disabled = true;
+
+        if (temporizadorMensaje) {
+            clearTimeout(temporizadorMensaje);
+        }
+
+        try {
+            const response = await fetch(`/api/v1/acceso?codigoSocio=${encodeURIComponent(codigoSocio)}`, {
+                method: "POST"
+            });
+
+            box.style.display = "block";
+
+            if (!response.ok) {
+                box.className = "alert alert-warning mt-4 p-3";
+                box.innerHTML = `<h3 class="fw-bold">⚠️ NO ENCONTRADO O CÓDIGO INVÁLIDO</h3>`;
+            } else {
+                const resultado = (await response.text()).trim();
+
+                if (resultado === 'PERMITIDO' || resultado === 'PERMITIDO_EMPLEADO') {
+                    box.className = "alert alert-success mt-4 p-3";
+                    box.innerHTML = `<h3 class="fw-bold">✅ ACCESO PERMITIDO</h3>`;
+                } else if (resultado === 'DENEGADO_VENCIDO') {
+                    box.className = "alert alert-danger mt-4 p-3";
+                    box.innerHTML = `<h3 class="fw-bold">❌ ACCESO DENEGADO (MEMBRESÍA VENCIDA)</h3>`;
+                } else {
+                    box.className = "alert alert-warning mt-4 p-3";
+                    box.innerHTML = `<h3 class="fw-bold">⚠️ CÓDIGO NO REGISTRADO</h3>`;
+                }
+            }
+
+        } catch (error) {
+            console.error("Error en la petición:", error);
+            box.style.display = "block";
+            box.className = "alert alert-secondary mt-4 p-3";
+            box.innerHTML = `<h3 class="fw-bold">🔌 ERROR DE CONEXIÓN CON EL SERVIDOR</h3>`;
+        } finally {
+            // 2. PROGRAMAR LA REAPERTURA DEL KIOSCO TRAS 5 SEGUNDOS
+            temporizadorMensaje = setTimeout(() => {
+                // Limpiar y ocultar el mensaje
+                box.style.display = "none";
+                box.innerHTML = "";
+
+                // Desbloquear input y botón
+                inputCodigo.disabled = false;
+                if (btnSubmit) btnSubmit.disabled = false;
+
+                // Limpiar el texto anterior y reenfocar para el siguiente socio
+                inputCodigo.value = "";
+                inputCodigo.focus();
+            }, 5000);
+        }
+    }
+</script>
+
+</body>
+</html>
