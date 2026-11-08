@@ -51,8 +51,13 @@
 <div class="flex-grow flex flex-col overflow-y-auto">
     <header class="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm">
         <h2 id="titulo-seccion" class="text-xl font-bold text-gray-800">Panel General</h2>
-        <div class="text-xs font-mono text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg">
-            <i class="fa-regular fa-calendar me-1"></i> <span id="fecha-actual"></span>
+        <div class="flex items-center gap-3">
+            <button id="btn-abrir-modal-planes" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-semibold transition border border-indigo-200 flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-tags text-indigo-500"></i> Gestionar Planes
+            </button>
+            <div class="text-xs font-mono text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg">
+                <i class="fa-regular fa-calendar me-1"></i> <span id="fecha-actual"></span>
+            </div>
         </div>
     </header>
 
@@ -181,12 +186,12 @@
                     <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
                         <i class="fa-solid fa-cash-register text-emerald-600"></i> Caja y Cobro de Membresías
                     </h3>
-                    <p class="text-xs text-gray-500">Registra renovaciones de membresías, procesa pagos y consulta el padrón de socios</p>
+                    <p class="text-xs text-gray-500">Selecciona el plan y la cantidad de unidades; el sistema calculará automáticamente el importe total y la nueva vigencia</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Formulario Pago -->
+                <!-- Formulario Pago Dinámico con Multiplicador -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-1 h-fit">
                     <h3 class="text-base font-bold mb-4 text-indigo-700 flex items-center gap-2">
                         <i class="fa-solid fa-credit-card"></i> Registrar Pago / Renovación
@@ -197,28 +202,50 @@
                             <input type="text" id="pago-codigo" required placeholder="Ej: 1001"
                                    class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm uppercase">
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Monto ($)</label>
-                            <input type="number" step="0.01" id="pago-monto" required placeholder="350.00"
-                                   class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Método</label>
-                                <select id="pago-metodo" class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                                    <option value="EFECTIVO">Efectivo</option>
-                                    <option value="TARJETA">Tarjeta</option>
-                                    <option value="TRANSFERENCIA">Transferencia</option>
+
+                        <!-- Menú Desplegable de Planes y Campo de Cantidad / Multiplicador -->
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="col-span-2">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-xs font-semibold text-gray-600">Plan de Membresía</label>
+                                    <button type="button" onclick="abrirModalPlanes()" class="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold transition">
+                                        + Planes
+                                    </button>
+                                </div>
+                                <select id="select-planes" required
+                                        class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm bg-white">
+                                    <option value="" disabled selected>Cargando planes disponibles...</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Meses</label>
-                                <input type="number" id="pago-meses" min="1" value="1" required
-                                       class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+                            <div class="col-span-1">
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Cantidad</label>
+                                <input type="number" id="pago-cantidad" min="1" value="1" required
+                                       class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-center">
                             </div>
                         </div>
-                        <button type="submit"
-                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition text-sm flex items-center justify-center gap-2">
+
+                        <!-- Campo Informativo Dinámico de Importe Total y Duración Acumulada -->
+                        <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 flex justify-between items-center">
+                            <div>
+                                <span class="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Importe Total a Cobrar</span>
+                                <span id="info-duracion-plan" class="text-xs text-gray-600 font-medium">Selecciona un plan para ver duración</span>
+                            </div>
+                            <div class="text-right">
+                                <span id="pago-precio-display" class="text-2xl font-black text-indigo-700 font-mono">$0.00</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Método de Pago</label>
+                            <select id="pago-metodo" class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+                                <option value="EFECTIVO">Efectivo</option>
+                                <option value="TARJETA">Tarjeta</option>
+                                <option value="TRANSFERENCIA">Transferencia</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" id="btn-procesar-pago"
+                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition text-sm flex items-center justify-center gap-2 shadow-sm">
                             <i class="fa-solid fa-receipt"></i> Procesar Pago
                         </button>
                     </form>
@@ -316,30 +343,44 @@
                         </label>
                     </div>
 
-                    <!-- SECCIÓN DE PAGO INICIAL -->
+                    <!-- SECCIÓN DE PAGO INICIAL CON PLAN DINÁMICO Y CANTIDAD -->
                     <div id="seccionPago" class="border-t border-gray-100 pt-4 space-y-4">
                         <h4 class="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-2">
-                            <i class="fa-solid fa-receipt"></i> Pago de Inscripción / Membresía
+                            <i class="fa-solid fa-receipt"></i> Plan Inicial y Cobro de Membresía
                         </h4>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Monto ($)</label>
-                                <input type="number" step="0.01" id="monto" placeholder="350.00" value="350.00"
-                                       class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-gray-800">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Método de Pago</label>
-                                <select id="metodoPago" class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                                    <option value="EFECTIVO">Efectivo</option>
-                                    <option value="TARJETA">Tarjeta</option>
-                                    <option value="TRANSFERENCIA">Transferencia</option>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Plan de Membresía</label>
+                                <select id="select-planes-registro"
+                                        class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm bg-white">
+                                    <option value="" disabled selected>Cargando planes disponibles...</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Meses</label>
-                                <input type="number" id="meses" min="1" value="1"
-                                       class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Cantidad</label>
+                                <input type="number" id="registro-cantidad" min="1" value="1"
+                                       class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-center">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Método de Pago</label>
+                            <select id="metodoPago" class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
+                                <option value="EFECTIVO">Efectivo</option>
+                                <option value="TARJETA">Tarjeta</option>
+                                <option value="TRANSFERENCIA">Transferencia</option>
+                            </select>
+                        </div>
+
+                        <!-- Info precio registro -->
+                        <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 flex justify-between items-center">
+                            <div>
+                                <span class="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Importe Total Inicial</span>
+                                <span id="info-duracion-registro" class="text-xs text-gray-600 font-medium">Selecciona un plan para ver duración</span>
+                            </div>
+                            <div class="text-right">
+                                <span id="registro-precio-display" class="text-2xl font-black text-indigo-700 font-mono">$0.00</span>
                             </div>
                         </div>
                     </div>
@@ -397,6 +438,84 @@
     </main>
 </div>
 
+<!-- MODAL GESTIÓN CRUD DE PLANES DE MEMBRESÍA -->
+<div id="modal-planes" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto space-y-6">
+        <div class="flex justify-between items-center pb-3 border-b border-gray-100">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-tags text-indigo-600"></i> Catálogo de Planes de Membresía
+                </h3>
+                <p class="text-xs text-gray-500">Crea nuevos planes o da de baja planes obsoletos</p>
+            </div>
+            <button onclick="cerrarModalPlanes()" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg transition text-sm">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Formulario Crear Plan -->
+        <form id="form-crear-plan" class="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200/80">
+            <h4 class="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-plus-circle"></i> Nuevo Plan de Membresía
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Nombre del Plan</label>
+                    <input type="text" id="nuevo-plan-nombre" required placeholder="Ej: Bimestre Estudiantil"
+                           class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Precio Oficial ($)</label>
+                    <input type="number" step="0.01" min="1" id="nuevo-plan-precio" required placeholder="650.00"
+                           class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Cantidad</label>
+                        <input type="number" min="1" id="nuevo-plan-cantidad" required value="1"
+                               class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Unidad</label>
+                        <select id="nuevo-plan-unidad" class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white">
+                            <option value="MESES">Meses</option>
+                            <option value="DIAS">Días</option>
+                            <option value="ANOS">Años</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg transition text-xs flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-floppy-disk"></i> Guardar Plan
+            </button>
+            <div id="modal-plan-mensaje" class="hidden text-xs p-2 rounded text-center font-medium"></div>
+        </form>
+
+        <!-- Lista de planes actuales -->
+        <div>
+            <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-list-check text-indigo-600"></i> Planes Existentes
+            </h4>
+            <div class="overflow-x-auto border border-gray-100 rounded-xl">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-gray-50 border-b text-gray-500 uppercase font-semibold">
+                        <tr>
+                            <th class="p-2.5">Nombre</th>
+                            <th class="p-2.5">Duración</th>
+                            <th class="p-2.5">Precio</th>
+                            <th class="p-2.5">Estado</th>
+                            <th class="p-2.5 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-modal-planes-body" class="divide-y divide-gray-100">
+                        <tr><td colspan="5" class="p-3 text-center text-gray-400">Cargando planes...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- CONTENEDOR OCULTO PARA EL TICKET TÉRMICO -->
 <div id="ticket-impresion" class="hidden">
     <div class="ticket-container">
@@ -418,7 +537,7 @@
             <thead><tr><th>Concepto</th><th style="text-align: right;">Total</th></tr></thead>
             <tbody>
             <tr>
-                <td>Membresía (<span id="t-meses">1</span> mes/es)</td>
+                <td><span id="t-meses">Membresía</span></td>
                 <td style="text-align: right;" id="t-monto">$0.00</td>
             </tr>
             </tbody>

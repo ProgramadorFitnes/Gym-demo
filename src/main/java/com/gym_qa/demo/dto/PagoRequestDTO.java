@@ -1,4 +1,5 @@
 package com.gym_qa.demo.dto;
+
 import com.gym_qa.demo.entity.enums.MetodoPago;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,12 +10,16 @@ import java.math.BigDecimal;
 
 @Data
 @Builder
-@AllArgsConstructor @NoArgsConstructor
+@AllArgsConstructor
+@NoArgsConstructor
 public class PagoRequestDTO {
 
     private String codigoSocio;
-    private BigDecimal monto;
-    private MetodoPago metodoPago; // Jackson mapeará "EFECTIVO" a MetodoPago.EFECTIVO
-    private Integer meses;
+    private Long planMembresiaId;
+    private Integer cantidad; // Multiplicador de unidades del plan (ej: 2 meses, 3 pases diarios)
+    private MetodoPago metodoPago;
 
+    // Campos opcionales para retrocompatibilidad
+    private BigDecimal monto;
+    private Integer meses;
 }

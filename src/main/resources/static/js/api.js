@@ -18,7 +18,10 @@ const ApiService = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error('Error al registrar el pago');
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al registrar el pago');
+        }
         return await res.json().catch(() => ({}));
     },
 
@@ -41,7 +44,6 @@ const ApiService = {
             method: 'POST'
         });
 
-        // Leemos texto puro sin depender de estructuras JSON
         const texto = await res.text();
         return { ok: res.ok, status: res.status, mensaje: texto };
     },
@@ -57,6 +59,54 @@ const ApiService = {
             throw new Error(`Error en registro: ${errorText}`);
         }
         return await res.json().catch(() => ({}));
+    },
+
+    // Endpoints para Planes de Membresía (CRUD Dinámico)
+    async getPlanes(soloActivos = true) {
+        try {
+            const res = await fetch(`${API_BASE}/planes?soloActivos=${soloActivos}`);
+            return res.ok ? await res.json() : [];
+        } catch (error) {
+            console.error('Error al obtener planes de membresía:', error);
+            return [];
+        }
+    },
+
+    async crearPlan(planData) {
+        const res = await fetch(`${API_BASE}/planes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(planData)
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al crear plan');
+        }
+        return await res.json();
+    },
+
+    async actualizarPlan(id, planData) {
+        const res = await fetch(`${API_BASE}/planes/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(planData)
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al actualizar plan');
+        }
+        return await res.json();
+    },
+
+    async desactivarPlan(id) {
+        const res = await fetch(`${API_BASE}/planes/${id}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al desactivar plan');
+        }
+        return await res.text();
     },
 
     // Endpoints para analíticas (Chart.js)

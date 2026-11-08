@@ -1,13 +1,20 @@
 const TicketPrinter = {
     imprimir(datosPago) {
-        document.getElementById('t-folio').innerText = datosPago.folio || Math.floor(100000 + Math.random() * 900000);
-        document.getElementById('t-fecha').innerText = new Date().toLocaleString('es-MX');
-        document.getElementById('t-codigo').innerText = datosPago.codigoSocio;
-        document.getElementById('t-nombre').innerText = datosPago.nombreSocio || datosPago.codigoSocio;
-        document.getElementById('t-meses').innerText = datosPago.meses;
-        document.getElementById('t-monto').innerText = `$${datosPago.monto.toFixed(2)}`;
-        document.getElementById('t-metodo').innerText = datosPago.metodoPago;
-        document.getElementById('t-vencimiento').innerText = datosPago.fechaMembresiaFin || 'Calculado por sistema';
+        const setTxt = (id, txt) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = txt;
+        };
+
+        setTxt('t-folio', datosPago.folio || Math.floor(100000 + Math.random() * 900000));
+        setTxt('t-fecha', new Date().toLocaleString('es-MX'));
+        setTxt('t-codigo', datosPago.codigoSocio || '---');
+        setTxt('t-nombre', datosPago.nombreSocio || datosPago.codigoSocio || 'Socio');
+        setTxt('t-meses', datosPago.nombrePlan || (datosPago.meses ? `${datosPago.meses} mes(es)` : 'Membresía'));
+        
+        const montoNum = Number(datosPago.monto);
+        setTxt('t-monto', !isNaN(montoNum) ? `$${montoNum.toFixed(2)}` : '$0.00');
+        setTxt('t-metodo', datosPago.metodoPago || 'EFECTIVO');
+        setTxt('t-vencimiento', datosPago.fechaMembresiaFin || 'Vigencia actualizada');
 
         window.print();
     }

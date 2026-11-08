@@ -4,6 +4,9 @@ let chartHorariosInstance = null;
 let chartMembresiasInstance = null;
 let chartMetodosInstance = null;
 
+// Catálogo de Planes en memoria
+let planesDisponibles = [];
+
 document.addEventListener('DOMContentLoaded', () => {
     // Fecha en la cabecera
     const fechaElem = document.getElementById('fecha-actual');
@@ -14,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Cargas iniciales de datos
+    cargarPlanes();
     cargarDashboard();
     cargarGraficas();
     cargarSocios();
@@ -76,6 +80,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // Modal Planes
+    const btnAbrirModalPlanes = document.getElementById('btn-abrir-modal-planes');
+    if (btnAbrirModalPlanes) {
+        btnAbrirModalPlanes.addEventListener('click', abrirModalPlanes);
+    }
+
+    const formCrearPlan = document.getElementById('form-crear-plan');
+    if (formCrearPlan) {
+        formCrearPlan.addEventListener('submit', manejarCrearPlan);
+    }
 });
 
 // Control de Secciones de la Interfaz (SPA con Sidebar Persistente)
@@ -118,12 +133,14 @@ function cambiarSeccion(seccion) {
         if (btnPagos) btnPagos.className = estiloActivo;
         if (tituloSeccion) tituloSeccion.innerText = 'Cobros y Gestión de Membresías';
         window.location.hash = 'pagos';
+        cargarPlanes();
         cargarSocios();
     } else if (seccion === 'registro') {
         if (vistaRegistro) vistaRegistro.classList.remove('hidden');
         if (btnRegistro) btnRegistro.className = estiloActivo;
         if (tituloSeccion) tituloSeccion.innerText = 'Alta de Nuevo Socio';
         window.location.hash = 'registro';
+        cargarPlanes();
         const inputCodigo = document.getElementById('codigoSocio');
         if (inputCodigo) setTimeout(() => inputCodigo.focus(), 100);
     } else if (seccion === 'accesos') {
@@ -132,6 +149,204 @@ function cambiarSeccion(seccion) {
         if (tituloSeccion) tituloSeccion.innerText = 'Monitoreo de Accesos / Entrada';
         window.location.hash = 'accesos';
         cargarAccesos();
+    }
+}
+
+// ==========================================
+// GESTIÓN DE PLANES Y MULTIPLICADOR DE CANTIDAD
+// ==========================================
+async function cargarPlanes() {
+    try {
+        planesDisponibles = await ApiService.getPlanes(true);
+        poblarSelectPlanes('select-planes', 'pago-cantidad', 'pago-precio-display', 'info-duracion-plan');
+        poblarSelectPlanes('select-planes-registro', 'registro-cantidad', 'registro-precio-display', 'info-duracion-registro');
+    } catch (err) {
+        console.error('Error al cargar planes de membresía:', err);
+    }
+}
+
+function formatearUnidad(cantidad, tipoUnidad) {
+    const unidad = (tipoUnidad || 'MESES').toUpperCase();
+    if (unidad === 'DIAS') return cantidad === 1 ? 'día' : 'días';
+    if (unidad === 'ANOS' || unidad === 'AÑOS') return cantidad === 1 ? 'año' : 'años';
+    return cantidad === 1 ? 'mes' : 'meses';
+}
+
+function poblarSelectPlanes(selectId, cantidadId, priceDisplayId, durationDisplayId) {
+    const select = document.getElementById(selectId);
+    const inputCant = document.getElementById(cantidadId);
+    if (!select) return;
+
+    select.innerHTML = '<option value="" disabled selected>Selecciona un plan de membresía...</option>';
+
+    if (!planesDisponibles || planesDisponibles.length === 0) {
+        select.innerHTML = '<option value="" disabled selected>No hay planes disponibles</option>';
+        actualizarPrecioDisplay(selectId, cantidadId, priceDisplayId, durationDisplayId);
+        return;
+    }
+
+    planesDisponibles.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        const duracionTxt = `${p.cantidad} ${formatearUnidad(p.cantidad, p.tipoUnidad)}`;
+        opt.textContent = `${p.nombre} (${duracionTxt}) — $${Number(p.precio).toFixed(2)}`;
+        select.appendChild(opt);
+    });
+
+    const recalcular = () => actualizarPrecioDisplay(selectId, cantidadId, priceDisplayId, durationDisplayId);
+
+    select.onchange = recalcular;
+    if (inputCant) {
+        inputCant.oninput = recalcular;
+        inputCant.onchange = recalcular;
+    }
+
+    actualizarPrecioDisplay(selectId, cantidadId, priceDisplayId, durationDisplayId);
+}
+
+function actualizarPrecioDisplay(selectId, cantidadId, priceDisplayId, durationDisplayId) {
+    const select = document.getElementById(selectId);
+    const inputCant = document.getElementById(cantidadId);
+    const priceDisplay = document.getElementById(priceDisplayId);
+    const durationDisplay = document.getElementById(durationDisplayId);
+
+    if (!select || !priceDisplay) return;
+
+    const planId = parseInt(select.value);
+    const plan = planesDisponibles.find(p => p.id === planId);
+    let cant = inputCant ? parseInt(inputCant.value) : 1;
+    if (isNaN(cant) || cant < 1) {
+        cant = 1;
+    }
+
+    if (plan) {
+        const precioUnitario = Number(plan.precio) || 0;
+        const precioTotal = precioUnitario * cant;
+        priceDisplay.innerText = `$${precioTotal.toFixed(2)}`;
+
+        if (durationDisplay) {
+            const planCantidad = plan.cantidad || 1;
+            const duracionTotal = planCantidad * cant;
+            const unidadTxt = formatearUnidad(duracionTotal, plan.tipoUnidad);
+            if (cant > 1) {
+                durationDisplay.innerText = `Total: ${duracionTotal} ${unidadTxt} (${cant} × $${precioUnitario.toFixed(2)})`;
+            } else {
+                durationDisplay.innerText = `Duración del plan: ${duracionTotal} ${unidadTxt}`;
+            }
+        }
+    } else {
+        priceDisplay.innerText = '$0.00';
+        if (durationDisplay) {
+            durationDisplay.innerText = 'Selecciona un plan para ver duración';
+        }
+    }
+}
+
+// Modal CRUD de Planes
+function abrirModalPlanes() {
+    const modal = document.getElementById('modal-planes');
+    if (modal) {
+        modal.classList.remove('hidden');
+        cargarTablaModalPlanes();
+    }
+}
+
+function cerrarModalPlanes() {
+    const modal = document.getElementById('modal-planes');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function cargarTablaModalPlanes() {
+    const tbody = document.getElementById('tabla-modal-planes-body');
+    if (!tbody) return;
+
+    try {
+        const todos = await ApiService.getPlanes(false);
+        tbody.innerHTML = '';
+        if (!todos || todos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-gray-500">No hay planes registrados.</td></tr>';
+            return;
+        }
+
+        todos.forEach(p => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50 transition';
+            const duracion = `${p.cantidad} ${formatearUnidad(p.cantidad, p.tipoUnidad)}`;
+            row.innerHTML = `
+                <td class="p-2.5 font-semibold text-gray-800">${p.nombre}</td>
+                <td class="p-2.5 text-gray-600">${duracion}</td>
+                <td class="p-2.5 font-mono font-bold text-indigo-600">$${Number(p.precio).toFixed(2)}</td>
+                <td class="p-2.5">
+                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${p.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${p.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                </td>
+                <td class="p-2.5 text-right">
+                    ${p.activo ? `
+                        <button onclick="desactivarPlan(${p.id})" class="text-red-600 hover:text-red-800 font-semibold text-[11px] px-2 py-1 bg-red-50 hover:bg-red-100 rounded transition">
+                            Desactivar
+                        </button>
+                    ` : `
+                        <button onclick="activarPlan(${p.id})" class="text-green-600 hover:text-green-800 font-semibold text-[11px] px-2 py-1 bg-green-50 hover:bg-green-100 rounded transition">
+                            Reactivar
+                        </button>
+                    `}
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-red-500">Error al cargar planes.</td></tr>';
+    }
+}
+
+async function manejarCrearPlan(e) {
+    e.preventDefault();
+    const msg = document.getElementById('modal-plan-mensaje');
+    msg.classList.add('hidden');
+
+    const nuevoPlan = {
+        nombre: document.getElementById('nuevo-plan-nombre').value.trim(),
+        precio: parseFloat(document.getElementById('nuevo-plan-precio').value),
+        cantidad: parseInt(document.getElementById('nuevo-plan-cantidad').value),
+        tipoUnidad: document.getElementById('nuevo-plan-unidad').value,
+        activo: true
+    };
+
+    try {
+        await ApiService.crearPlan(nuevoPlan);
+        msg.className = 'text-xs p-2 rounded text-center font-medium bg-green-100 text-green-800 border border-green-200';
+        msg.innerText = '¡Plan guardado exitosamente!';
+        msg.classList.remove('hidden');
+
+        document.getElementById('form-crear-plan').reset();
+        await cargarPlanes();
+        cargarTablaModalPlanes();
+    } catch (err) {
+        msg.className = 'text-xs p-2 rounded text-center font-medium bg-red-100 text-red-800 border border-red-200';
+        msg.innerText = err.message || 'Error al guardar el plan';
+        msg.classList.remove('hidden');
+    }
+}
+
+async function desactivarPlan(id) {
+    if (!confirm('¿Deseas dar de baja este plan? Los socios vigentes conservarán su periodo activo.')) return;
+    try {
+        await ApiService.desactivarPlan(id);
+        await cargarPlanes();
+        cargarTablaModalPlanes();
+    } catch (err) {
+        alert('Error al desactivar el plan: ' + err.message);
+    }
+}
+
+async function activarPlan(id) {
+    try {
+        await ApiService.actualizarPlan(id, { activo: true });
+        await cargarPlanes();
+        cargarTablaModalPlanes();
+    } catch (err) {
+        alert('Error al reactivar el plan: ' + err.message);
     }
 }
 
@@ -191,49 +406,64 @@ function seleccionarParaPago(codigoSocio) {
     if (!codigoSocio || codigoSocio === 'N/A') return;
     cambiarSeccion('pagos');
     const inputCodigo = document.getElementById('pago-codigo');
-    const inputMonto = document.getElementById('pago-monto');
+    const selectPlanes = document.getElementById('select-planes');
+    const inputCantidad = document.getElementById('pago-cantidad');
     if (inputCodigo) inputCodigo.value = codigoSocio;
-    if (inputMonto) {
-        inputMonto.focus();
-        inputMonto.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (inputCantidad) inputCantidad.value = 1;
+    if (selectPlanes) {
+        selectPlanes.focus();
+        selectPlanes.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
 
-// Procesar Pago
+// Procesar Pago (Vinculado a PlanMembresiaId y Multiplicador de Cantidad)
 async function manejarFormularioPago(e) {
     e.preventDefault();
     const mensajeDiv = document.getElementById('pago-mensaje');
     mensajeDiv.classList.add('hidden');
 
+    const selectPlanes = document.getElementById('select-planes');
+    const inputCantidad = document.getElementById('pago-cantidad');
+    const planMembresiaId = selectPlanes ? parseInt(selectPlanes.value) : null;
+    let cantidad = inputCantidad ? parseInt(inputCantidad.value) : 1;
+    if (isNaN(cantidad) || cantidad < 1) cantidad = 1;
+
+    if (!planMembresiaId) {
+        mensajeDiv.className = 'mt-3 p-3 text-xs rounded-lg text-center font-medium bg-red-100 text-red-800 border border-red-200';
+        mensajeDiv.innerText = 'Por favor, selecciona un plan de membresía de la lista.';
+        mensajeDiv.classList.remove('hidden');
+        return;
+    }
+
     const payload = {
         codigoSocio: document.getElementById('pago-codigo').value.trim().toUpperCase(),
-        monto: parseFloat(document.getElementById('pago-monto').value),
-        metodoPago: document.getElementById('pago-metodo').value,
-        meses: parseInt(document.getElementById('pago-meses').value)
+        planMembresiaId: planMembresiaId,
+        cantidad: cantidad,
+        metodoPago: document.getElementById('pago-metodo').value
     };
 
     try {
         const resultadoBackend = await ApiService.registrarPago(payload);
 
         mensajeDiv.className = 'mt-3 p-3 text-xs rounded-lg text-center font-medium bg-green-100 text-green-800 border border-green-200';
-        mensajeDiv.innerText = '¡Pago registrado y membresía renovada!';
+        const vencimientoStr = resultadoBackend.fechaMembresiaFin ? ` (Nueva vigencia: ${resultadoBackend.fechaMembresiaFin})` : '';
+        mensajeDiv.innerText = `¡Pago registrado con éxito! Plan: ${resultadoBackend.nombrePlan || ''} - $${Number(resultadoBackend.monto).toFixed(2)}${vencimientoStr}`;
         mensajeDiv.classList.remove('hidden');
 
-        // Imprimir ticket pasándole los datos combinados
+        // Imprimir ticket con los datos exactos del backend
         if (window.TicketPrinter) {
-            TicketPrinter.imprimir({
-                ...payload,
-                ...resultadoBackend
-            });
+            TicketPrinter.imprimir(resultadoBackend);
         }
 
         document.getElementById('form-pago').reset();
+        if (inputCantidad) inputCantidad.value = 1;
+        actualizarPrecioDisplay('select-planes', 'pago-cantidad', 'pago-precio-display', 'info-duracion-plan');
         cargarDashboard();
         cargarSocios();
         cargarGraficas();
     } catch (err) {
         mensajeDiv.className = 'mt-3 p-3 text-xs rounded-lg text-center font-medium bg-red-100 text-red-800 border border-red-200';
-        mensajeDiv.innerText = 'Error al registrar el pago. Verifique el código de socio.';
+        mensajeDiv.innerText = err.message || 'Error al registrar el pago. Verifique el código de socio.';
         mensajeDiv.classList.remove('hidden');
     }
 }
@@ -275,30 +505,29 @@ async function manejarRegistro(event) {
         // 1. Guardar socio en backend
         await ApiService.crearUsuario(usuarioData);
 
-        // 2. Si no es staff, cobrar e imprimir comprobante
+        // 2. Si no es staff, cobrar con el plan oficial seleccionado y su multiplicador
         if (!esEmpleado) {
-            const monto = parseFloat(document.getElementById('monto').value);
-            const meses = parseInt(document.getElementById('meses').value) || 1;
-            const metodoPago = document.getElementById('metodoPago').value;
+            const selectPlanesReg = document.getElementById('select-planes-registro');
+            const inputCantidadReg = document.getElementById('registro-cantidad');
+            const planMembresiaId = selectPlanesReg ? parseInt(selectPlanesReg.value) : null;
+            let cantidad = inputCantidadReg ? parseInt(inputCantidadReg.value) : 1;
+            if (isNaN(cantidad) || cantidad < 1) cantidad = 1;
+
+            if (!planMembresiaId) {
+                throw new Error('Por favor, selecciona un plan de membresía para el cobro inicial.');
+            }
 
             const pagoData = {
                 codigoSocio,
-                monto: isNaN(monto) ? 0 : monto,
-                metodoPago,
-                meses
+                planMembresiaId,
+                cantidad,
+                metodoPago: document.getElementById('metodoPago').value
             };
 
             const resultadoPago = await ApiService.registrarPago(pagoData);
 
             if (window.TicketPrinter) {
-                TicketPrinter.imprimir({
-                    codigoSocio,
-                    nombreSocio: `${nombre} ${apellido}`,
-                    monto,
-                    meses,
-                    metodoPago,
-                    fechaMembresiaFin: resultadoPago.fechaMembresiaFin
-                });
+                TicketPrinter.imprimir(resultadoPago);
             }
         }
 
@@ -310,6 +539,9 @@ async function manejarRegistro(event) {
         }`;
 
         document.getElementById('formRegistro').reset();
+        const inputCantidadReg = document.getElementById('registro-cantidad');
+        if (inputCantidadReg) inputCantidadReg.value = 1;
+        actualizarPrecioDisplay('select-planes-registro', 'registro-cantidad', 'registro-precio-display', 'info-duracion-registro');
         alternarSeccionPago();
         document.getElementById('codigoSocio').focus();
 
@@ -599,7 +831,7 @@ async function renderGraficaEstadoMembresias() {
     }
 
     const ctx = canvas.getContext('2d');
-    chartMembresiasInstance = new Chart(ctx, {
+    chartMembresInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Activas', 'Por Vencer (≤5 d)', 'Vencidas'],
