@@ -12,7 +12,16 @@ import java.util.Optional;
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByCodigoSocio(String codigoSocio);
 
+    Optional<Usuario> findByCodigoSocioIgnoreCase(String codigoSocio);
+
     Optional<Usuario> findByTelefono(String telefono);
+
+    // Búsqueda flexible por código, nombre, apellido o teléfono
+    @Query("SELECT u FROM Usuario u WHERE LOWER(u.codigoSocio) LIKE LOWER(CONCAT('%', :q, '%')) " +
+           "OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :q, '%')) " +
+           "OR LOWER(u.apellido) LIKE LOWER(CONCAT('%', :q, '%')) " +
+           "OR u.telefono LIKE CONCAT('%', :q, '%')")
+    List<Usuario> buscarPorFiltroGeneral(@Param("q") String q);
 
     // Socios con membresía activa (fecha fin igual o posterior a la fecha actual)
     List<Usuario> findByFechaMembresiaFinGreaterThanEqual(LocalDate fecha);
@@ -30,5 +39,4 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // Socios Activos
     @Query("SELECT COUNT(u) FROM Usuario u WHERE u.fechaMembresiaFin >= :hoy ")
     long cuentasActivas(@Param("hoy") LocalDate hoy);
-
 }

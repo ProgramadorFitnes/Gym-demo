@@ -12,4 +12,12 @@ import lombok.NoArgsConstructor;
 public class HorarioPicoDTO {
     private String hora;
     private long accesos;
+
+    public long getCantidad() {
+        return accesos;
+    }
+
+    public long getConteo() {
+        return accesos;
+    }
 }

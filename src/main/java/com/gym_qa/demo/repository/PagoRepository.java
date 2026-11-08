@@ -16,4 +16,8 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 
     @Query("SELECT p FROM Pago p WHERE p.fechaPago >= :inicio AND p.fechaPago <= :fin ORDER BY p.fechaPago ASC")
     List<Pago> findPagosPorRangoDeFechas(@Param("inicio") LocalDate inicio, @Param("fin") LocalDate fin);
+
+    List<Pago> findByFechaPago(LocalDate fechaPago);
+
+    List<Pago> findByUsuarioIdOrderByFechaPagoAscIdAsc(Long usuarioId);
 }

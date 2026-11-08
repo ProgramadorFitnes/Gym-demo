@@ -8,8 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,19 +18,10 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
-    private LocalDate hoy = LocalDate.now();
-
-
     @Override
     public Usuario registrarUsuario(Usuario usuario) {
-        // Asignamos fecha de inicio hoy si viene nula
-        if (usuario.getFechaMembresiaInicio() == null) {
-            usuario.setFechaMembresiaInicio(LocalDate.now());
-        }
-
-        // Si es empleado o socio, calculamos 1 mes de vigencia por defecto
-        if (usuario.getFechaMembresiaFin() == null) {
-            usuario.setFechaMembresiaFin(usuario.getFechaMembresiaInicio().plusMonths(1));
+        if (usuario.getCodigoSocio() != null) {
+            usuario.setCodigoSocio(usuario.getCodigoSocio().trim().toUpperCase());
         }
 
         // Si no se especifica esEmpleado, aseguramos false por defecto
@@ -38,12 +29,29 @@ public class UsuarioServiceImpl implements UsuarioService {
             usuario.setEsEmpleado(false);
         }
 
+        // Asignamos fecha de inicio hoy si viene nula
+        if (usuario.getFechaMembresiaInicio() == null) {
+            usuario.setFechaMembresiaInicio(LocalDate.now());
+        }
+
+        // Si es empleado, le damos 10 años de vigencia.
+        // Si es socio regular y no trae fecha fin explícita, iniciamos vencido (ayer)
+        // para que al procesarse su pago inmediatamente después, la vigencia se calcule
+        // exactamente según el plan contratado (1 día, 7 días, 1 mes, etc.) a partir de hoy.
+        if (usuario.getFechaMembresiaFin() == null) {
+            if (Boolean.TRUE.equals(usuario.getEsEmpleado())) {
+                usuario.setFechaMembresiaFin(usuario.getFechaMembresiaInicio().plusYears(10));
+            } else {
+                usuario.setFechaMembresiaFin(LocalDate.now().minusDays(1));
+            }
+        }
+
         return usuarioRepository.save(usuario);
     }
 
     @Override
     public List<UsuarioResumenDTO> buscarSocios(String query) {
-// 1. Si la consulta viene vacía o nula, devolvemos todos
+        // 1. Si la consulta viene vacía o nula, devolvemos todos
         if (query == null || query.isBlank()) {
             return usuarioRepository.findAll().stream()
                     .map(this::convertirADTO)
@@ -51,16 +59,14 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         String terminoLimpio = query.trim();
-
-        // 2. Intentar buscar por código de socio exacto
-        Optional<Usuario> usuarioPorCodigo = usuarioRepository.findByCodigoSocio(terminoLimpio);
-        if (usuarioPorCodigo.isPresent()) {
-            return List.of(convertirADTO(usuarioPorCodigo.get()));
+        List<Usuario> usuarios = usuarioRepository.buscarPorFiltroGeneral(terminoLimpio);
+        if (usuarios == null || usuarios.isEmpty()) {
+            return Collections.emptyList();
         }
 
-        // 3. Si no se encuentra por código, intentar por teléfono exacto
-        Optional<Usuario> usuarioPorTelefono = usuarioRepository.findByTelefono(terminoLimpio);
-        return usuarioPorTelefono.map(usuario -> List.of(convertirADTO(usuario))).orElse(null);
+        return usuarios.stream()
+                .map(this::convertirADTO)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -72,48 +78,52 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public List<UsuarioResumenDTO> obtenerPorVencer(int dias) {
+        LocalDate hoy = LocalDate.now();
         LocalDate limite = hoy.plusDays(dias);
         return usuarioRepository.findByFechaMembresiaFinBetween(hoy, limite)
                 .stream()
                 .map(this::convertirADTO)
-                .collect(Collectors.toList());    }
+                .collect(Collectors.toList());
+    }
 
     @Override
     public UsuarioResumenDTO cambiarEstatusEmpleado(String codigoSocio, boolean esEmpleado) {
         Usuario usuario = usuarioRepository.findByCodigoSocio(codigoSocio)
                 .orElseThrow(() -> new RuntimeException("Socio no encontrado: " + codigoSocio));
 
-        // 1. Quitar el estatus de empleado
         usuario.setEsEmpleado(esEmpleado);
 
         if (esEmpleado) {
-            // Al activarlo como staff, le otorgamos vigencia amplia
             usuario.setFechaMembresiaInicio(LocalDate.now());
             usuario.setFechaMembresiaFin(LocalDate.now().plusYears(10));
         } else {
-            // Al desactivarlo, su membresía vence para que requiera pago
             usuario.setFechaMembresiaFin(LocalDate.now().minusDays(1));
         }
 
         Usuario usuarioActualizado = usuarioRepository.save(usuario);
-        return convertirADTO(usuario);
+        return convertirADTO(usuarioActualizado);
     }
 
     private UsuarioResumenDTO convertirADTO(Usuario u) {
+        boolean activo = estatusUsuario(u.getFechaMembresiaFin());
         return UsuarioResumenDTO.builder()
                 .id(u.getId())
                 .codigoSocio(u.getCodigoSocio())
-                .nombre(u.getNombre())
-                .telefono(u.getTelefono())
+                .nombre(u.getNombre() != null ? u.getNombre().trim() : "")
+                .apellido(u.getApellido() != null ? u.getApellido().trim() : "")
+                .telefono(u.getTelefono() != null ? u.getTelefono() : "S/N")
                 .fechaMembresiaInicio(u.getFechaMembresiaInicio())
                 .fechaMembresiaFin(u.getFechaMembresiaFin())
-                .activo(estatusUsuario(u.getFechaMembresiaFin()))
+                .activo(activo)
+                .estadoMembresia(activo ? "ACTIVA" : "VENCIDA")
                 .build();
-
     }
 
-    private boolean estatusUsuario(LocalDate fechaMembresiaFin  ){
-        return fechaMembresiaFin.isAfter(hoy);
+    private boolean estatusUsuario(LocalDate fechaMembresiaFin) {
+        if (fechaMembresiaFin == null) {
+            return false;
+        }
+        LocalDate hoy = LocalDate.now();
+        return !fechaMembresiaFin.isBefore(hoy);
     }
-
 }

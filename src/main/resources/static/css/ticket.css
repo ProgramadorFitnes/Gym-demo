@@ -1,15 +1,18 @@
 @media print {
     body * {
-        visibility: hidden;
+        visibility: hidden !important;
     }
-    #ticket-impresion, #ticket-impresion * {
-        visibility: visible;
+
+    /* Impresión de Ticket de Pago */
+    body.imprimiendo-ticket #ticket-impresion,
+    body.imprimiendo-ticket #ticket-impresion * {
+        visibility: visible !important;
     }
-    #ticket-impresion {
+    body.imprimiendo-ticket #ticket-impresion {
         position: absolute;
         left: 0;
         top: 0;
-        width: 58mm; /* Cambiar a 80mm si tu impresora es más ancha */
+        width: 72mm;
         display: block !important;
         background: white;
         color: black;
@@ -19,6 +22,27 @@
         padding: 2mm;
         margin: 0;
     }
+
+    /* Impresión de Acta / Ticket de Corte de Caja */
+    body.imprimiendo-corte #ticket-corte-impresion,
+    body.imprimiendo-corte #ticket-corte-impresion * {
+        visibility: visible !important;
+    }
+    body.imprimiendo-corte #ticket-corte-impresion {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 78mm;
+        display: block !important;
+        background: white;
+        color: black;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 11px;
+        line-height: 1.25;
+        padding: 3mm;
+        margin: 0;
+    }
+
     .ticket-container { width: 100%; }
     .ticket-header, .ticket-footer { text-align: center; }
     .ticket-divider { text-align: center; letter-spacing: -1px; margin: 4px 0; }

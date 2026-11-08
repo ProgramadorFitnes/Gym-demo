@@ -3,6 +3,7 @@ package com.gym_qa.demo.controller;
 import com.gym_qa.demo.entity.PlanMembresia;
 import com.gym_qa.demo.repository.PlanMembresiaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +22,7 @@ public class PlanMembresiaController {
         if (soloActivos) {
             return ResponseEntity.ok(planMembresiaRepository.findByActivoTrueOrderByPrecioAsc());
         }
-        return ResponseEntity.ok(planMembresiaRepository.findAll());
+        return ResponseEntity.ok(planMembresiaRepository.findAll(Sort.by(Sort.Direction.ASC, "id")));
     }
 
     @GetMapping("/{id}")
@@ -55,6 +56,15 @@ public class PlanMembresiaController {
             if (planDetails.getCantidad() != null) plan.setCantidad(planDetails.getCantidad());
             if (planDetails.getTipoUnidad() != null) plan.setTipoUnidad(planDetails.getTipoUnidad());
             if (planDetails.getActivo() != null) plan.setActivo(planDetails.getActivo());
+            PlanMembresia actualizado = planMembresiaRepository.save(plan);
+            return ResponseEntity.ok(actualizado);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}/estado")
+    public ResponseEntity<?> cambiarEstadoPlan(@PathVariable Long id, @RequestParam boolean activo) {
+        return planMembresiaRepository.findById(id).map(plan -> {
+            plan.setActivo(activo);
             PlanMembresia actualizado = planMembresiaRepository.save(plan);
             return ResponseEntity.ok(actualizado);
         }).orElse(ResponseEntity.notFound().build());

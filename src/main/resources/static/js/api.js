@@ -109,6 +109,16 @@ const ApiService = {
         return await res.text();
     },
 
+    async cambiarEstadoPlan(id, activo) {
+        const res = await fetch(`${API_BASE}/planes/${id}/estado?activo=${activo}`, {
+            method: 'PUT'
+        });
+        if (!res.ok) {
+            return await this.actualizarPlan(id, { activo });
+        }
+        return await res.json();
+    },
+
     // Endpoints para analíticas (Chart.js)
     async getIngresosMensuales() {
         try {
@@ -146,6 +156,50 @@ const ApiService = {
             return res.ok ? await res.json() : [];
         } catch (error) {
             console.error('Error al obtener métodos de pago:', error);
+            return [];
+        }
+    },
+
+    async getDistribucionPlanes() {
+        try {
+            const res = await fetch(`${API_BASE}/dashboard/distribucion-planes`);
+            return res.ok ? await res.json() : [];
+        } catch (error) {
+            console.error('Error al obtener distribución de planes:', error);
+            return [];
+        }
+    },
+
+    // Endpoints para Corte y Arqueo de Caja
+    async getResumenCajaHoy() {
+        try {
+            const res = await fetch(`${API_BASE}/caja/resumen-hoy`);
+            return res.ok ? await res.json() : null;
+        } catch (error) {
+            console.error('Error al obtener resumen de caja:', error);
+            return null;
+        }
+    },
+
+    async realizarCorteCaja(corteData) {
+        const res = await fetch(`${API_BASE}/caja/corte`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corteData)
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al guardar el corte de caja');
+        }
+        return await res.json();
+    },
+
+    async getHistorialCortes() {
+        try {
+            const res = await fetch(`${API_BASE}/caja/historial`);
+            return res.ok ? await res.json() : [];
+        } catch (error) {
+            console.error('Error al obtener historial de cortes:', error);
             return [];
         }
     }

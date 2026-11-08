@@ -44,4 +44,9 @@ public class DashboardController {
     public ResponseEntity<List<MetodoPagoDTO>> obtenerMetodosPago() {
         return ResponseEntity.ok(dashboardService.obtenerMetodosPago());
     }
+
+    @GetMapping("/distribucion-planes")
+    public ResponseEntity<List<DistribucionPlanDTO>> obtenerDistribucionPlanes() {
+        return ResponseEntity.ok(dashboardService.obtenerDistribucionPlanes());
+    }
 }

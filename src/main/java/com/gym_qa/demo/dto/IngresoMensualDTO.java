@@ -15,4 +15,12 @@ public class IngresoMensualDTO {
     private String mes;
     private BigDecimal total;
     private long transacciones;
+
+    public BigDecimal getMonto() {
+        return total != null ? total : BigDecimal.ZERO;
+    }
+
+    public BigDecimal getIngresos() {
+        return total != null ? total : BigDecimal.ZERO;
+    }
 }

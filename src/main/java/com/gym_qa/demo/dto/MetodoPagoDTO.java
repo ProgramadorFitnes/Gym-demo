@@ -15,4 +15,16 @@ public class MetodoPagoDTO {
     private String metodo;
     private long cantidad;
     private BigDecimal total;
+
+    public String getNombre() {
+        return metodo;
+    }
+
+    public BigDecimal getMonto() {
+        return total != null ? total : BigDecimal.ZERO;
+    }
+
+    public long getTransacciones() {
+        return cantidad;
+    }
 }

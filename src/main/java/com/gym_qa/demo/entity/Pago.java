@@ -26,7 +26,7 @@ public class Pago {
     private BigDecimal monto;
 
     @Column(name = "Metodo_pago", nullable = false)
-    @Enumerated(EnumType.STRING)
+    @Enumerated(EnumType.ORDINAL)
     private MetodoPago metodoPago;
 
     @Column(name = "Fecha_pago", nullable = false)

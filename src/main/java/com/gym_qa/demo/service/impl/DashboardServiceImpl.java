@@ -1,10 +1,6 @@
 package com.gym_qa.demo.service.impl;
 
-import com.gym_qa.demo.dto.DashboardResumenDTO;
-import com.gym_qa.demo.dto.EstadoMembresiasDTO;
-import com.gym_qa.demo.dto.HorarioPicoDTO;
-import com.gym_qa.demo.dto.IngresoMensualDTO;
-import com.gym_qa.demo.dto.MetodoPagoDTO;
+import com.gym_qa.demo.dto.*;
 import com.gym_qa.demo.entity.Pago;
 import com.gym_qa.demo.entity.RegistroAcceso;
 import com.gym_qa.demo.entity.Usuario;
@@ -17,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -145,5 +142,65 @@ public class DashboardServiceImpl implements DashboardService {
         }
 
         return resultado;
+    }
+
+    @Override
+    public List<DistribucionPlanDTO> obtenerDistribucionPlanes() {
+        List<Pago> pagos = pagoRepository.findAll();
+        if (pagos == null || pagos.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Agrupar pagos por nombre de plan
+        Map<String, List<Pago>> pagosPorPlan = pagos.stream().collect(Collectors.groupingBy(p -> {
+            if (p.getPlanMembresia() != null && p.getPlanMembresia().getNombre() != null) {
+                return p.getPlanMembresia().getNombre();
+            } else if (p.getMesesComprados() != null) {
+                return p.getMesesComprados() + " Mes(es)";
+            }
+            return "General / Estándar";
+        }));
+
+        List<DistribucionPlanDTO> lista = new ArrayList<>();
+        long sumaTotalClientesUnicos = 0;
+
+        for (Map.Entry<String, List<Pago>> entry : pagosPorPlan.entrySet()) {
+            String planNombre = entry.getKey();
+            List<Pago> listaPagos = entry.getValue();
+
+            long totalVentas = listaPagos.size();
+            BigDecimal totalIngresos = listaPagos.stream()
+                    .map(p -> p.getMonto() != null ? p.getMonto() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Filtro de conteo único: cada usuario cuenta una sola vez por plan
+            Set<Long> usuariosUnicos = listaPagos.stream()
+                    .filter(p -> p.getUsuario() != null && p.getUsuario().getId() != null)
+                    .map(p -> p.getUsuario().getId())
+                    .collect(Collectors.toSet());
+
+            long clientesUnicos = usuariosUnicos.isEmpty() ? totalVentas : usuariosUnicos.size();
+            sumaTotalClientesUnicos += clientesUnicos;
+
+            lista.add(DistribucionPlanDTO.builder()
+                    .nombrePlan(planNombre)
+                    .clientesUnicos(clientesUnicos)
+                    .totalVentas(totalVentas)
+                    .totalIngresos(totalIngresos)
+                    .porcentajeClientes(0.0) // Se calcula abajo
+                    .build());
+        }
+
+        // Calcular porcentajes basados en la ponderación de clientes únicos
+        if (sumaTotalClientesUnicos > 0) {
+            for (DistribucionPlanDTO dto : lista) {
+                double pct = ((double) dto.getClientesUnicos() / sumaTotalClientesUnicos) * 100.0;
+                dto.setPorcentajeClientes(BigDecimal.valueOf(pct).setScale(1, RoundingMode.HALF_UP).doubleValue());
+            }
+        }
+
+        // Ordenar descendentemente por clientes únicos
+        lista.sort((a, b) -> Long.compare(b.getClientesUnicos(), a.getClientesUnicos()));
+        return lista;
     }
 }

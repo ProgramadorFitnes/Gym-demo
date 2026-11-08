@@ -10,11 +10,14 @@ import com.gym_qa.demo.repository.PlanMembresiaRepository;
 import com.gym_qa.demo.repository.UsuarioRepository;
 import com.gym_qa.demo.service.PagoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class PagoServiceImpl implements PagoService {
@@ -28,6 +31,45 @@ public class PagoServiceImpl implements PagoService {
     @Autowired
     private PlanMembresiaRepository planMembresiaRepository;
 
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void sincronizarVigenciasUsuarios() {
+        List<Usuario> usuarios = usuarioRepository.findAll();
+        for (Usuario u : usuarios) {
+            if (Boolean.TRUE.equals(u.getEsEmpleado())) {
+                continue;
+            }
+            List<Pago> pagos = pagoRepository.findByUsuarioIdOrderByFechaPagoAscIdAsc(u.getId());
+            if (pagos == null || pagos.isEmpty()) {
+                continue;
+            }
+            LocalDate fechaFinCalculada = null;
+            for (Pago p : pagos) {
+                LocalDate fechaPago = p.getFechaPago() != null ? p.getFechaPago() : LocalDate.now();
+                LocalDate fechaBase = (fechaFinCalculada != null && !fechaFinCalculada.isBefore(fechaPago))
+                        ? fechaFinCalculada
+                        : fechaPago;
+                PlanMembresia plan = p.getPlanMembresia();
+                int duracion = (p.getMesesComprados() != null && p.getMesesComprados() > 0)
+                        ? p.getMesesComprados()
+                        : (plan != null && plan.getCantidad() != null && plan.getCantidad() > 0 ? plan.getCantidad() : 1);
+                TipoUnidad unidad = (plan != null && plan.getTipoUnidad() != null) ? plan.getTipoUnidad() : TipoUnidad.MESES;
+
+                if (unidad == TipoUnidad.DIAS) {
+                    fechaFinCalculada = fechaBase.plusDays(duracion);
+                } else if (unidad == TipoUnidad.ANOS || unidad == TipoUnidad.AÑOS) {
+                    fechaFinCalculada = fechaBase.plusYears(duracion);
+                } else {
+                    fechaFinCalculada = fechaBase.plusMonths(duracion);
+                }
+            }
+            if (fechaFinCalculada != null && !fechaFinCalculada.equals(u.getFechaMembresiaFin())) {
+                u.setFechaMembresiaFin(fechaFinCalculada);
+                usuarioRepository.save(u);
+            }
+        }
+    }
+
     @Override
     @Transactional
     public Pago registrarPago(PagoRequestDTO request) {
@@ -35,7 +77,9 @@ public class PagoServiceImpl implements PagoService {
             throw new RuntimeException("El código de socio es requerido.");
         }
 
-        Usuario usuario = usuarioRepository.findByCodigoSocio(request.getCodigoSocio().trim().toUpperCase())
+        String codigoLimpio = request.getCodigoSocio().trim();
+        Usuario usuario = usuarioRepository.findByCodigoSocioIgnoreCase(codigoLimpio)
+                .or(() -> usuarioRepository.findByCodigoSocio(codigoLimpio.toUpperCase()))
                 .orElseThrow(() -> new RuntimeException("Socio no encontrado con el código: " + request.getCodigoSocio()));
 
         LocalDate hoy = LocalDate.now();
