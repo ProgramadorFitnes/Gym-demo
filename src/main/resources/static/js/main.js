@@ -13,15 +13,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Cargas iniciales
+    // Cargas iniciales de datos
     cargarDashboard();
-    cargarSocios();
     cargarGraficas();
+    cargarSocios();
 
     // Eventos de Navegación Sidebar
     document.querySelectorAll('aside nav button[data-section]').forEach(btn => {
         btn.addEventListener('click', (e) => cambiarSeccion(e.currentTarget.dataset.section));
     });
+
+    // Detectar hash en URL si existe (ej. index.html#registro)
+    const hash = window.location.hash.replace('#', '');
+    if (['dashboard', 'pagos', 'registro', 'accesos'].includes(hash)) {
+        cambiarSeccion(hash);
+    }
 
     // Buscador en tiempo real de socios
     const inputBusqueda = document.getElementById('input-busqueda');
@@ -35,6 +41,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const formPago = document.getElementById('form-pago');
     if (formPago) {
         formPago.addEventListener('submit', manejarFormularioPago);
+    }
+
+    // Formulario Registro de Nuevo Socio
+    const formRegistro = document.getElementById('formRegistro');
+    if (formRegistro) {
+        formRegistro.addEventListener('submit', manejarRegistro);
+    }
+
+    const chkEmpleado = document.getElementById('esEmpleado');
+    if (chkEmpleado) {
+        chkEmpleado.addEventListener('change', alternarSeccionPago);
     }
 
     // Formulario Check-in
@@ -61,46 +78,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Control de Secciones de la Interfaz
+// Control de Secciones de la Interfaz (SPA con Sidebar Persistente)
 function cambiarSeccion(seccion) {
     const vistaDashboard = document.getElementById('vista-dashboard');
+    const vistaPagos = document.getElementById('vista-pagos');
+    const vistaRegistro = document.getElementById('vista-registro');
     const vistaAccesos = document.getElementById('vista-accesos');
+
     const btnDashboard = document.getElementById('btn-nav-dashboard');
-    const btnAnaliticas = document.getElementById('btn-nav-analiticas');
+    const btnPagos = document.getElementById('btn-nav-pagos');
+    const btnRegistro = document.getElementById('btn-nav-registro');
     const btnAccesos = document.getElementById('btn-nav-accesos');
     const tituloSeccion = document.getElementById('titulo-seccion');
 
     const estiloActivo = 'w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 bg-indigo-800 text-white shadow-sm transition';
     const estiloInactivo = 'w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 hover:bg-indigo-800/60 text-indigo-200 hover:text-white transition';
 
+    // Ocultar todas las secciones
+    if (vistaDashboard) vistaDashboard.classList.add('hidden');
+    if (vistaPagos) vistaPagos.classList.add('hidden');
+    if (vistaRegistro) vistaRegistro.classList.add('hidden');
+    if (vistaAccesos) vistaAccesos.classList.add('hidden');
+
+    // Desactivar botones de navegación
+    if (btnDashboard) btnDashboard.className = estiloInactivo;
+    if (btnPagos) btnPagos.className = estiloInactivo;
+    if (btnRegistro) btnRegistro.className = estiloInactivo;
+    if (btnAccesos) btnAccesos.className = estiloInactivo;
+
     if (seccion === 'dashboard') {
-        vistaDashboard.classList.remove('hidden');
-        vistaAccesos.classList.add('hidden');
+        if (vistaDashboard) vistaDashboard.classList.remove('hidden');
         if (btnDashboard) btnDashboard.className = estiloActivo;
-        if (btnAnaliticas) btnAnaliticas.className = estiloInactivo;
-        if (btnAccesos) btnAccesos.className = estiloInactivo;
-        if (tituloSeccion) tituloSeccion.innerText = 'Panel General';
+        if (tituloSeccion) tituloSeccion.innerText = 'Dashboard y Analíticas';
+        window.location.hash = 'dashboard';
         cargarDashboard();
         cargarGraficas();
-    } else if (seccion === 'analiticas') {
-        vistaDashboard.classList.remove('hidden');
-        vistaAccesos.classList.add('hidden');
-        if (btnDashboard) btnDashboard.className = estiloInactivo;
-        if (btnAnaliticas) btnAnaliticas.className = estiloActivo;
-        if (btnAccesos) btnAccesos.className = estiloInactivo;
-        if (tituloSeccion) tituloSeccion.innerText = 'Analíticas y Rendimiento';
-        cargarGraficas();
-        const secAnaliticas = document.getElementById('seccion-analiticas');
-        if (secAnaliticas) {
-            secAnaliticas.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+    } else if (seccion === 'pagos') {
+        if (vistaPagos) vistaPagos.classList.remove('hidden');
+        if (btnPagos) btnPagos.className = estiloActivo;
+        if (tituloSeccion) tituloSeccion.innerText = 'Cobros y Gestión de Membresías';
+        window.location.hash = 'pagos';
+        cargarSocios();
+    } else if (seccion === 'registro') {
+        if (vistaRegistro) vistaRegistro.classList.remove('hidden');
+        if (btnRegistro) btnRegistro.className = estiloActivo;
+        if (tituloSeccion) tituloSeccion.innerText = 'Alta de Nuevo Socio';
+        window.location.hash = 'registro';
+        const inputCodigo = document.getElementById('codigoSocio');
+        if (inputCodigo) setTimeout(() => inputCodigo.focus(), 100);
     } else if (seccion === 'accesos') {
-        vistaDashboard.classList.add('hidden');
-        vistaAccesos.classList.remove('hidden');
+        if (vistaAccesos) vistaAccesos.classList.remove('hidden');
         if (btnAccesos) btnAccesos.className = estiloActivo;
-        if (btnDashboard) btnDashboard.className = estiloInactivo;
-        if (btnAnaliticas) btnAnaliticas.className = estiloInactivo;
         if (tituloSeccion) tituloSeccion.innerText = 'Monitoreo de Accesos / Entrada';
+        window.location.hash = 'accesos';
         cargarAccesos();
     }
 }
@@ -159,9 +189,14 @@ async function cargarSocios(query = '') {
 
 function seleccionarParaPago(codigoSocio) {
     if (!codigoSocio || codigoSocio === 'N/A') return;
-    cambiarSeccion('dashboard');
-    document.getElementById('pago-codigo').value = codigoSocio;
-    document.getElementById('pago-monto').focus();
+    cambiarSeccion('pagos');
+    const inputCodigo = document.getElementById('pago-codigo');
+    const inputMonto = document.getElementById('pago-monto');
+    if (inputCodigo) inputCodigo.value = codigoSocio;
+    if (inputMonto) {
+        inputMonto.focus();
+        inputMonto.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 }
 
 // Procesar Pago
@@ -200,6 +235,96 @@ async function manejarFormularioPago(e) {
         mensajeDiv.className = 'mt-3 p-3 text-xs rounded-lg text-center font-medium bg-red-100 text-red-800 border border-red-200';
         mensajeDiv.innerText = 'Error al registrar el pago. Verifique el código de socio.';
         mensajeDiv.classList.remove('hidden');
+    }
+}
+
+// Gestión de Registro de Nuevos Socios
+function alternarSeccionPago() {
+    const chk = document.getElementById('esEmpleado');
+    const seccionPago = document.getElementById('seccionPago');
+    if (chk && seccionPago) {
+        seccionPago.classList.toggle('hidden', chk.checked);
+    }
+}
+
+async function manejarRegistro(event) {
+    event.preventDefault();
+
+    const respuestaDiv = document.getElementById('respuesta');
+    const btnSubmit = document.getElementById('btnSubmit');
+
+    respuestaDiv.classList.add('hidden');
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Procesando...`;
+
+    const codigoSocio = document.getElementById('codigoSocio').value.trim().toUpperCase();
+    const nombre = document.getElementById('nombre').value.trim();
+    const apellido = document.getElementById('apellido').value.trim();
+    const esEmpleado = document.getElementById('esEmpleado').checked;
+
+    const usuarioData = {
+        codigoSocio,
+        nombre,
+        apellido,
+        telefono: document.getElementById('telefono').value.trim(),
+        correo: document.getElementById('correo').value.trim(),
+        esEmpleado
+    };
+
+    try {
+        // 1. Guardar socio en backend
+        await ApiService.crearUsuario(usuarioData);
+
+        // 2. Si no es staff, cobrar e imprimir comprobante
+        if (!esEmpleado) {
+            const monto = parseFloat(document.getElementById('monto').value);
+            const meses = parseInt(document.getElementById('meses').value) || 1;
+            const metodoPago = document.getElementById('metodoPago').value;
+
+            const pagoData = {
+                codigoSocio,
+                monto: isNaN(monto) ? 0 : monto,
+                metodoPago,
+                meses
+            };
+
+            const resultadoPago = await ApiService.registrarPago(pagoData);
+
+            if (window.TicketPrinter) {
+                TicketPrinter.imprimir({
+                    codigoSocio,
+                    nombreSocio: `${nombre} ${apellido}`,
+                    monto,
+                    meses,
+                    metodoPago,
+                    fechaMembresiaFin: resultadoPago.fechaMembresiaFin
+                });
+            }
+        }
+
+        // Feedback positivo
+        respuestaDiv.classList.remove('hidden');
+        respuestaDiv.className = 'mt-3 p-3 rounded-lg text-xs font-medium text-center bg-green-100 text-green-800 border border-green-200';
+        respuestaDiv.innerHTML = `<i class="fa-solid fa-circle-check text-green-600 me-2"></i> ${
+            esEmpleado ? 'Empleado registrado con éxito.' : '¡Socio registrado, cobrado y ticket emitido!'
+        }`;
+
+        document.getElementById('formRegistro').reset();
+        alternarSeccionPago();
+        document.getElementById('codigoSocio').focus();
+
+        // Actualizar dashboard y tabla de socios
+        cargarDashboard();
+        cargarSocios();
+        cargarGraficas();
+
+    } catch (error) {
+        respuestaDiv.classList.remove('hidden');
+        respuestaDiv.className = 'mt-3 p-3 rounded-lg text-xs font-medium text-center bg-red-100 text-red-800 border border-red-200';
+        respuestaDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 me-2"></i> ${error.message}`;
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Registrar y Cobrar`;
     }
 }
 
@@ -244,7 +369,7 @@ async function manejarCheckin(e) {
 
     try {
         await cargarAccesos();
-        cargarGraficas(); // Actualizar gráfica de horarios pico
+        cargarGraficas();
     } catch (errTabla) {
         console.warn('La entrada se registró, pero falló al refrescar el historial:', errTabla);
     }
@@ -292,7 +417,6 @@ async function cargarGraficas() {
         return;
     }
 
-    // Configuración global estética minimalista
     Chart.defaults.font.family = "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
     Chart.defaults.color = '#6b7280';
 
@@ -386,7 +510,6 @@ async function renderGraficaHorariosPico() {
     const labels = data.map(d => d.hora);
     const conteos = data.map(d => Number(d.accesos) || 0);
 
-    // Calcular hora pico
     let maxAccesos = -1;
     let horaPico = '--:--';
     data.forEach(d => {
