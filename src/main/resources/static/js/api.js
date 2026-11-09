@@ -202,5 +202,108 @@ const ApiService = {
             console.error('Error al obtener historial de cortes:', error);
             return [];
         }
+    },
+
+    // Endpoints para Punto de Venta (POS) e Inventario
+    async getProductosPos(soloActivos = true) {
+        try {
+            const res = await fetch(`${API_BASE}/pos/productos?soloActivos=${soloActivos}`);
+            return res.ok ? await res.json() : [];
+        } catch (error) {
+            console.error('Error al obtener productos POS:', error);
+            return [];
+        }
+    },
+
+    async crearProductoPos(productoData) {
+        const res = await fetch(`${API_BASE}/pos/productos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(productoData)
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al crear producto');
+        }
+        return await res.json();
+    },
+
+    async actualizarProductoPos(id, productoData) {
+        const res = await fetch(`${API_BASE}/pos/productos/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(productoData)
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al actualizar producto');
+        }
+        return await res.json();
+    },
+
+    async cambiarEstadoProductoPos(id, activo) {
+        const res = await fetch(`${API_BASE}/pos/productos/${id}/estado?activo=${activo}`, {
+            method: 'PUT'
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al cambiar estado del producto');
+        }
+        return await res.json();
+    },
+
+    async actualizarStockProductoPos(id, cantidad) {
+        const res = await fetch(`${API_BASE}/pos/productos/${id}/stock?cantidad=${cantidad}`, {
+            method: 'PUT'
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al actualizar stock');
+        }
+        return await res.json();
+    },
+
+    async realizarVentaPos(ventaData) {
+        const res = await fetch(`${API_BASE}/pos/vender`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ventaData)
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Error al realizar venta');
+        }
+        return await res.json();
+    },
+
+    async getVentasPos() {
+        try {
+            const res = await fetch(`${API_BASE}/pos/ventas`);
+            return res.ok ? await res.json() : [];
+        } catch (error) {
+            console.error('Error al obtener ventas POS:', error);
+            return [];
+        }
+    },
+
+    // Endpoints para Historial de Ventas y Métricas Financieras (Hoy vs Mes)
+    async getResumenVentas() {
+        try {
+            const res = await fetch(`${API_BASE}/ventas/resumen`);
+            return res.ok ? await res.json() : null;
+        } catch (error) {
+            console.error('Error al obtener resumen de ventas:', error);
+            return null;
+        }
+    },
+
+    async getHistorialVentas(tipo = 'TODOS') {
+        try {
+            const res = await fetch(`${API_BASE}/ventas/historial?tipo=${encodeURIComponent(tipo)}`);
+            return res.ok ? await res.json() : [];
+        } catch (error) {
+            console.error('Error al obtener historial de ventas:', error);
+            return [];
+        }
     }
 };

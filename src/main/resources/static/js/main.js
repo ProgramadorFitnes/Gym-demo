@@ -11,6 +11,15 @@ let planesDisponibles = [];
 // Cache de Resumen de Caja del Día actual
 let resumenCajaHoyCache = null;
 
+// Estado para Punto de Venta (POS) e Inventario
+let productosPosCache = [];
+let carritoPos = [];
+let metodoPagoPosSeleccionado = 'Efectivo';
+
+// Estado para Historial de Ventas y Finanzas
+let historialVentasCache = [];
+let filtroTipoVentasActual = 'TODOS';
+
 document.addEventListener('DOMContentLoaded', () => {
     // Fecha en la cabecera
     const fechaElem = document.getElementById('fecha-actual');
@@ -33,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Detectar hash en URL si existe (ej. index.html#corte)
     const hash = window.location.hash.replace('#', '');
-    if (['dashboard', 'pagos', 'corte', 'registro', 'accesos'].includes(hash)) {
+    if (['dashboard', 'pos', 'pagos', 'corte', 'historial', 'registro', 'accesos'].includes(hash)) {
         cambiarSeccion(hash);
     }
 
@@ -43,6 +52,29 @@ document.addEventListener('DOMContentLoaded', () => {
         inputBusqueda.addEventListener('input', (e) => {
             cargarSocios(e.target.value.trim());
         });
+    }
+
+    // Eventos Punto de Venta (POS) e Inventario
+    const btnAbrirModalInventario = document.getElementById('btn-abrir-modal-inventario');
+    if (btnAbrirModalInventario) {
+        btnAbrirModalInventario.addEventListener('click', abrirModalInventarioPos);
+    }
+
+    const inputBuscarPos = document.getElementById('pos-buscar-producto');
+    if (inputBuscarPos) {
+        inputBuscarPos.addEventListener('input', (e) => {
+            filtrarCatalogoPos(e.target.value.trim());
+        });
+    }
+
+    const inputEfectivoRecibido = document.getElementById('pos-input-efectivo-recibido');
+    if (inputEfectivoRecibido) {
+        inputEfectivoRecibido.addEventListener('input', recalcularCambioPos);
+    }
+
+    const formCrearProductoPos = document.getElementById('form-crear-producto-pos');
+    if (formCrearProductoPos) {
+        formCrearProductoPos.addEventListener('submit', manejarGuardarProductoPos);
     }
 
     // Formulario de Pago
@@ -127,14 +159,18 @@ document.addEventListener('DOMContentLoaded', () => {
 // Control de Secciones de la Interfaz (SPA con Sidebar Persistente)
 function cambiarSeccion(seccion) {
     const vistaDashboard = document.getElementById('vista-dashboard');
+    const vistaPos = document.getElementById('vista-pos');
     const vistaPagos = document.getElementById('vista-pagos');
     const vistaCorte = document.getElementById('vista-corte');
+    const vistaHistorial = document.getElementById('vista-historial');
     const vistaRegistro = document.getElementById('vista-registro');
     const vistaAccesos = document.getElementById('vista-accesos');
 
     const btnDashboard = document.getElementById('btn-nav-dashboard');
+    const btnPos = document.getElementById('btn-nav-pos');
     const btnPagos = document.getElementById('btn-nav-pagos');
     const btnCorte = document.getElementById('btn-nav-corte');
+    const btnHistorial = document.getElementById('btn-nav-historial');
     const btnRegistro = document.getElementById('btn-nav-registro');
     const btnAccesos = document.getElementById('btn-nav-accesos');
     const tituloSeccion = document.getElementById('titulo-seccion');
@@ -144,15 +180,19 @@ function cambiarSeccion(seccion) {
 
     // Ocultar todas las secciones
     if (vistaDashboard) vistaDashboard.classList.add('hidden');
+    if (vistaPos) vistaPos.classList.add('hidden');
     if (vistaPagos) vistaPagos.classList.add('hidden');
     if (vistaCorte) vistaCorte.classList.add('hidden');
+    if (vistaHistorial) vistaHistorial.classList.add('hidden');
     if (vistaRegistro) vistaRegistro.classList.add('hidden');
     if (vistaAccesos) vistaAccesos.classList.add('hidden');
 
     // Desactivar botones de navegación
     if (btnDashboard) btnDashboard.className = estiloInactivo;
+    if (btnPos) btnPos.className = estiloInactivo;
     if (btnPagos) btnPagos.className = estiloInactivo;
     if (btnCorte) btnCorte.className = estiloInactivo;
+    if (btnHistorial) btnHistorial.className = estiloInactivo;
     if (btnRegistro) btnRegistro.className = estiloInactivo;
     if (btnAccesos) btnAccesos.className = estiloInactivo;
 
@@ -163,6 +203,13 @@ function cambiarSeccion(seccion) {
         window.location.hash = 'dashboard';
         cargarDashboard();
         cargarGraficas();
+    } else if (seccion === 'pos') {
+        if (vistaPos) vistaPos.classList.remove('hidden');
+        if (btnPos) btnPos.className = estiloActivo;
+        if (tituloSeccion) tituloSeccion.innerText = 'Punto de Venta (POS) - Mostrador';
+        window.location.hash = 'pos';
+        cargarCatalogoPos();
+        renderizarCarritoPos();
     } else if (seccion === 'pagos') {
         if (vistaPagos) vistaPagos.classList.remove('hidden');
         if (btnPagos) btnPagos.className = estiloActivo;
@@ -176,6 +223,12 @@ function cambiarSeccion(seccion) {
         if (tituloSeccion) tituloSeccion.innerText = 'Corte de Caja Diario (Arqueo)';
         window.location.hash = 'corte';
         cargarCorteCaja();
+    } else if (seccion === 'historial') {
+        if (vistaHistorial) vistaHistorial.classList.remove('hidden');
+        if (btnHistorial) btnHistorial.className = estiloActivo;
+        if (tituloSeccion) tituloSeccion.innerText = 'Historial de Ventas y Métricas Financieras';
+        window.location.hash = 'historial';
+        cargarHistorialYResumenVentas();
     } else if (seccion === 'registro') {
         if (vistaRegistro) vistaRegistro.classList.remove('hidden');
         if (btnRegistro) btnRegistro.className = estiloActivo;
@@ -576,6 +629,10 @@ async function manejarFormularioPago(e) {
         await cargarDashboard();
         await cargarSocios();
         cargarGraficas();
+        if (typeof cargarResumenVentas === 'function') {
+            cargarResumenVentas();
+            cargarHistorialVentas(filtroTipoVentasActual);
+        }
     } catch (err) {
         msg.className = 'mt-3 p-3 text-xs rounded-lg text-center font-medium bg-red-100 text-red-700 block';
         msg.innerText = `Error al registrar pago: ${err.message}`;
@@ -680,6 +737,10 @@ async function manejarRegistro(e) {
         await cargarDashboard();
         await cargarSocios();
         cargarGraficas();
+        if (typeof cargarResumenVentas === 'function') {
+            cargarResumenVentas();
+            cargarHistorialVentas(filtroTipoVentasActual);
+        }
         if (typeof cargarCorteCaja === 'function') {
             cargarCorteCaja();
         }
@@ -1450,5 +1511,675 @@ async function renderGraficaDistribucionPlanes() {
                 }
             }
         }
+    });
+}
+
+// ==========================================
+// MÓDULO PUNTO DE VENTA (POS) E INVENTARIO
+// ==========================================
+async function cargarCatalogoPos() {
+    const grid = document.getElementById('pos-catalogo-grid');
+    const badgeContador = document.getElementById('pos-contador-productos');
+    if (!grid) return;
+
+    try {
+        const productos = await ApiService.getProductosPos(true);
+        productosPosCache = productos || [];
+        if (badgeContador) {
+            badgeContador.innerText = `${productosPosCache.length} producto${productosPosCache.length === 1 ? '' : 's'}`;
+        }
+        renderizarCatalogoPos(productosPosCache);
+    } catch (err) {
+        console.error('Error al cargar catálogo POS:', err);
+        grid.innerHTML = '<div class="col-span-full p-8 text-center text-red-500 bg-white rounded-2xl border border-red-100">Error al consultar los productos del catálogo.</div>';
+    }
+}
+
+function filtrarCatalogoPos(query = '') {
+    if (!productosPosCache) return;
+    const q = query.toLowerCase().trim();
+    const filtrados = q === '' 
+        ? productosPosCache 
+        : productosPosCache.filter(p => (p.nombre || '').toLowerCase().includes(q));
+    renderizarCatalogoPos(filtrados);
+}
+
+function renderizarCatalogoPos(productos) {
+    const grid = document.getElementById('pos-catalogo-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+
+    if (!productos || productos.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full p-8 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
+                <i class="fa-solid fa-box-open text-3xl text-gray-300 mb-2"></i>
+                <p class="text-xs font-semibold">No se encontraron productos disponibles</p>
+                <p class="text-[11px] text-gray-400 mt-1">Crea nuevos productos en el botón "Administrar Inventario".</p>
+            </div>
+        `;
+        return;
+    }
+
+    productos.forEach(p => {
+        const agotado = p.stock <= 0;
+        let stockBadge = '';
+        if (agotado) {
+            stockBadge = '<span class="px-2 py-0.5 text-[10px] font-bold rounded-md bg-red-100 text-red-700">Agotado</span>';
+        } else if (p.stock <= 5) {
+            stockBadge = `<span class="px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 text-amber-800">¡Solo ${p.stock}!</span>`;
+        } else {
+            stockBadge = `<span class="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">Stock: ${p.stock}</span>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = `bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between transition group relative select-none ${
+            agotado ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'hover:border-amber-400 hover:shadow-md cursor-pointer active:scale-[0.98]'
+        }`;
+
+        card.innerHTML = `
+            <div class="flex justify-between items-start gap-2 mb-2">
+                <span class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold flex-shrink-0 group-hover:bg-amber-500 group-hover:text-white transition">
+                    <i class="fa-solid fa-cube"></i>
+                </span>
+                ${stockBadge}
+            </div>
+            <div class="mb-3">
+                <h4 class="text-xs font-bold text-gray-800 line-clamp-2 leading-snug group-hover:text-amber-700 transition" title="${p.nombre}">
+                    ${p.nombre}
+                </h4>
+            </div>
+            <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span class="text-base font-black text-gray-900 font-mono">$${Number(p.precio).toFixed(2)}</span>
+                <button type="button" class="w-7 h-7 rounded-lg ${agotado ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white'} flex items-center justify-center text-xs transition"
+                        ${agotado ? 'disabled' : ''}>
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+        `;
+
+        if (!agotado) {
+            card.onclick = () => agregarAlCarritoPos(p.id);
+        }
+
+        grid.appendChild(card);
+    });
+}
+
+function agregarAlCarritoPos(productoId) {
+    const producto = productosPosCache.find(p => p.id === productoId);
+    if (!producto) return;
+
+    if (producto.stock <= 0) {
+        mostrarNotificacionPos('Este producto está agotado.', 'error');
+        return;
+    }
+
+    const itemEnCarrito = carritoPos.find(i => i.productoId === productoId);
+    if (itemEnCarrito) {
+        if (itemEnCarrito.cantidad + 1 > producto.stock) {
+            mostrarNotificacionPos(`Stock máximo alcanzado para ${producto.nombre} (${producto.stock} disponibles).`, 'error');
+            return;
+        }
+        itemEnCarrito.cantidad += 1;
+    } else {
+        carritoPos.push({
+            productoId: producto.id,
+            nombre: producto.nombre,
+            precio: Number(producto.precio),
+            stock: producto.stock,
+            cantidad: 1
+        });
+    }
+
+    renderizarCarritoPos();
+}
+
+function modificarCantidadCarritoPos(productoId, delta) {
+    const item = carritoPos.find(i => i.productoId === productoId);
+    if (!item) return;
+
+    if (delta > 0 && item.cantidad + delta > item.stock) {
+        mostrarNotificacionPos(`Stock máximo alcanzado para ${item.nombre} (${item.stock} disponibles).`, 'error');
+        return;
+    }
+
+    item.cantidad += delta;
+    if (item.cantidad <= 0) {
+        eliminarDelCarritoPos(productoId);
+        return;
+    }
+
+    renderizarCarritoPos();
+}
+
+function eliminarDelCarritoPos(productoId) {
+    carritoPos = carritoPos.filter(i => i.productoId !== productoId);
+    renderizarCarritoPos();
+}
+
+function vaciarCarritoPos() {
+    if (carritoPos.length === 0) return;
+    carritoPos = [];
+    renderizarCarritoPos();
+}
+
+function renderizarCarritoPos() {
+    const container = document.getElementById('pos-cart-items-container');
+    const displayTotal = document.getElementById('pos-total-display');
+    const badgeItems = document.getElementById('pos-cart-badge-items');
+    const resumenArticulos = document.getElementById('pos-resumen-cant-articulos');
+    const btnCobrar = document.getElementById('btn-finalizar-venta-pos');
+
+    if (!container) return;
+
+    if (carritoPos.length === 0) {
+        container.innerHTML = `
+            <div class="py-8 text-center text-gray-400">
+                <i class="fa-solid fa-cart-arrow-down text-3xl text-gray-300 mb-2"></i>
+                <p class="text-xs font-medium">El carrito está vacío</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Toca o haz clic en cualquier producto para agregarlo al ticket</p>
+            </div>
+        `;
+        if (displayTotal) displayTotal.innerText = '$0.00';
+        if (badgeItems) badgeItems.innerText = '0 ítems agregados';
+        if (resumenArticulos) resumenArticulos.innerText = '0 artículos';
+        if (btnCobrar) btnCobrar.disabled = true;
+        recalcularCambioPos();
+        return;
+    }
+
+    let totalCalculado = 0;
+    let cantTotalUnidades = 0;
+    container.innerHTML = '';
+
+    carritoPos.forEach(item => {
+        const subtotal = item.precio * item.cantidad;
+        totalCalculado += subtotal;
+        cantTotalUnidades += item.cantidad;
+
+        const row = document.createElement('div');
+        row.className = 'py-2.5 flex items-center justify-between gap-2 border-b border-gray-100 last:border-b-0';
+
+        row.innerHTML = `
+            <div class="flex-grow min-w-0 pr-1">
+                <h5 class="text-xs font-bold text-gray-800 truncate" title="${item.nombre}">${item.nombre}</h5>
+                <span class="text-[11px] text-gray-400 font-mono">$${item.precio.toFixed(2)} c/u</span>
+            </div>
+            <!-- Controles de Cantidad -->
+            <div class="flex items-center gap-1.5 flex-shrink-0 bg-gray-50 p-1 rounded-lg border border-gray-200">
+                <button type="button" onclick="modificarCantidadCarritoPos(${item.productoId}, -1)"
+                        class="w-5 h-5 rounded flex items-center justify-center text-[10px] text-gray-600 hover:bg-white hover:text-red-600 transition">
+                    <i class="fa-solid fa-minus"></i>
+                </button>
+                <span class="font-mono font-bold text-xs px-1 text-gray-800">${item.cantidad}</span>
+                <button type="button" onclick="modificarCantidadCarritoPos(${item.productoId}, 1)"
+                        class="w-5 h-5 rounded flex items-center justify-center text-[10px] text-gray-600 hover:bg-white hover:text-green-600 transition"
+                        ${item.cantidad >= item.stock ? 'disabled title="Stock máximo"' : ''}>
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+            <!-- Subtotal y Eliminar -->
+            <div class="text-right flex items-center gap-2 flex-shrink-0">
+                <span class="font-mono font-bold text-xs text-gray-900">$${subtotal.toFixed(2)}</span>
+                <button type="button" onclick="eliminarDelCarritoPos(${item.productoId})"
+                        class="text-gray-300 hover:text-red-500 p-1 transition text-xs" title="Quitar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    if (displayTotal) displayTotal.innerText = `$${totalCalculado.toFixed(2)}`;
+    if (badgeItems) badgeItems.innerText = `${carritoPos.length} producto${carritoPos.length === 1 ? '' : 's'} (${cantTotalUnidades} unidad${cantTotalUnidades === 1 ? '' : 'es'})`;
+    if (resumenArticulos) resumenArticulos.innerText = `${cantTotalUnidades} artículo${cantTotalUnidades === 1 ? '' : 's'}`;
+    if (btnCobrar) btnCobrar.disabled = false;
+
+    recalcularCambioPos();
+}
+
+function seleccionarMetodoPagoPos(metodo) {
+    metodoPagoPosSeleccionado = metodo;
+    const btnEf = document.getElementById('pos-btn-metodo-efectivo');
+    const btnTj = document.getElementById('pos-btn-metodo-tarjeta');
+    const btnTr = document.getElementById('pos-btn-metodo-transferencia');
+    const seccionCambio = document.getElementById('pos-seccion-cambio-efectivo');
+
+    const estiloActivo = 'p-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition bg-emerald-50 border-emerald-400 text-emerald-800 shadow-sm';
+    const estiloInactivo = 'p-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100';
+
+    if (btnEf) btnEf.className = metodo === 'Efectivo' ? estiloActivo : estiloInactivo;
+    if (btnTj) btnTj.className = metodo === 'Tarjeta' ? 'p-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition bg-cyan-50 border-cyan-400 text-cyan-800 shadow-sm' : estiloInactivo;
+    if (btnTr) btnTr.className = metodo === 'Transferencia' ? 'p-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition bg-purple-50 border-purple-400 text-purple-800 shadow-sm' : estiloInactivo;
+
+    if (seccionCambio) {
+        seccionCambio.style.display = metodo === 'Efectivo' ? 'block' : 'none';
+    }
+    recalcularCambioPos();
+}
+
+function recalcularCambioPos() {
+    const inputEf = document.getElementById('pos-input-efectivo-recibido');
+    const displayCambio = document.getElementById('pos-display-cambio');
+    if (!displayCambio) return;
+
+    const totalVenta = carritoPos.reduce((acc, curr) => acc + (curr.precio * curr.cantidad), 0);
+    const efRecibido = parseFloat(inputEf ? inputEf.value : 0) || 0;
+
+    if (efRecibido <= 0 || metodoPagoPosSeleccionado !== 'Efectivo') {
+        displayCambio.innerText = '$0.00';
+        displayCambio.className = 'font-mono font-black text-gray-500 text-sm';
+        return;
+    }
+
+    const cambio = efRecibido - totalVenta;
+    if (cambio < 0) {
+        displayCambio.innerText = `Faltan $${Math.abs(cambio).toFixed(2)}`;
+        displayCambio.className = 'font-mono font-bold text-rose-600 text-xs';
+    } else {
+        displayCambio.innerText = `$${cambio.toFixed(2)}`;
+        displayCambio.className = 'font-mono font-black text-emerald-700 text-sm';
+    }
+}
+
+function mostrarNotificacionPos(mensaje, tipo = 'info') {
+    const msg = document.getElementById('pos-mensaje-venta');
+    if (!msg) return;
+
+    if (tipo === 'error') {
+        msg.className = 'mt-2 text-xs p-2.5 rounded-lg text-center font-medium bg-red-100 text-red-700 block';
+    } else if (tipo === 'success') {
+        msg.className = 'mt-2 text-xs p-2.5 rounded-lg text-center font-medium bg-green-100 text-green-700 block';
+    } else {
+        msg.className = 'mt-2 text-xs p-2.5 rounded-lg text-center font-medium bg-blue-100 text-blue-700 block';
+    }
+    msg.innerText = mensaje;
+    setTimeout(() => {
+        if (msg) msg.classList.add('hidden');
+    }, 3500);
+}
+
+async function finalizarVentaPos() {
+    const btn = document.getElementById('btn-finalizar-venta-pos');
+    const inputResponsable = document.getElementById('pos-usuario-responsable');
+
+    if (!carritoPos || carritoPos.length === 0) {
+        mostrarNotificacionPos('Agrega al menos un producto al carrito para cobrar.', 'error');
+        return;
+    }
+
+    const responsable = inputResponsable ? inputResponsable.value.trim() : 'Recepcionista Turno';
+
+    const payload = {
+        metodoPago: metodoPagoPosSeleccionado,
+        usuarioResponsable: responsable || 'Recepcionista Turno',
+        items: carritoPos.map(i => ({
+            productoId: i.productoId,
+            cantidad: i.cantidad
+        }))
+    };
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando Cobro...';
+    }
+
+    try {
+        const respuesta = await ApiService.realizarVentaPos(payload);
+
+        mostrarNotificacionPos(`¡Venta #${respuesta.folio || respuesta.id} cobrada exitosamente por $${Number(respuesta.total).toFixed(2)}!`, 'success');
+
+        // Imprimir Ticket Térmico de Venta POS
+        TicketPrinter.imprimirVentaPos({
+            folio: respuesta.folio || respuesta.id,
+            fechaHora: respuesta.fechaHora,
+            usuarioResponsable: respuesta.usuarioResponsable,
+            metodoPago: respuesta.metodoPago,
+            total: respuesta.total,
+            detalles: respuesta.detalles
+        });
+
+        // Limpiar Carrito
+        carritoPos = [];
+        const inputEf = document.getElementById('pos-input-efectivo-recibido');
+        if (inputEf) inputEf.value = '';
+        renderizarCarritoPos();
+
+        // Actualizar visualmente el stock disponible en mostrador de inmediato
+        await cargarCatalogoPos();
+
+        // Si la sección de corte de caja está activa, refrescarla
+        if (typeof cargarCorteCaja === 'function') {
+            cargarCorteCaja();
+        }
+        if (typeof cargarResumenVentas === 'function') {
+            cargarResumenVentas();
+            cargarHistorialVentas(filtroTipoVentasActual);
+        }
+    } catch (err) {
+        mostrarNotificacionPos(`Error al cobrar: ${err.message}`, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-circle-check text-base"></i> Cobrar / Finalizar Venta';
+        }
+    }
+}
+
+// ==========================================
+// MODAL CRUD DE INVENTARIO Y PRODUCTOS POS
+// ==========================================
+function abrirModalInventarioPos() {
+    const modal = document.getElementById('modal-inventario-pos');
+    if (modal) {
+        modal.classList.remove('hidden');
+        cargarTablaInventarioPos();
+    }
+}
+
+function cerrarModalInventarioPos() {
+    const modal = document.getElementById('modal-inventario-pos');
+    if (modal) modal.classList.add('hidden');
+    const form = document.getElementById('form-crear-producto-pos');
+    if (form) form.reset();
+    const idInput = document.getElementById('pos-producto-id');
+    if (idInput) idInput.value = '';
+    const titulo = document.getElementById('pos-form-titulo');
+    if (titulo) titulo.innerText = 'Nuevo Producto';
+}
+
+async function cargarTablaInventarioPos() {
+    const tbody = document.getElementById('tabla-modal-inventario-body');
+    if (!tbody) return;
+
+    try {
+        const productos = await ApiService.getProductosPos(false); // Obtener todos (activos e inactivos)
+        tbody.innerHTML = '';
+
+        if (!productos || productos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-400">No hay productos registrados en el inventario.</td></tr>';
+            return;
+        }
+
+        productos.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50 transition border-b border-gray-100';
+
+            const badgeEstado = p.activo
+                ? '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-100 text-green-800">Activo</span>'
+                : '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 text-gray-600">Inactivo</span>';
+
+            const badgeStock = p.stock <= 0
+                ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">0</span>'
+                : `<span class="px-2 py-0.5 rounded text-[10px] font-bold ${p.stock <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800'}">${p.stock}</span>`;
+
+            const btnEstado = p.activo
+                ? `<button onclick="cambiarEstadoProductoPos(${p.id}, false)" class="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 rounded-lg bg-red-50 border border-red-200 hover:bg-red-100 transition" title="Dar de baja"><i class="fa-solid fa-toggle-on me-1"></i>Desactivar</button>`
+                : `<button onclick="cambiarEstadoProductoPos(${p.id}, true)" class="text-xs text-emerald-700 hover:text-emerald-900 font-semibold px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition" title="Reactivar"><i class="fa-solid fa-toggle-off me-1"></i>Activar</button>`;
+
+            tr.innerHTML = `
+                <td class="p-2.5 font-mono text-gray-400 font-bold">#${p.id}</td>
+                <td class="p-2.5 font-semibold text-gray-800">${p.nombre}</td>
+                <td class="p-2.5 font-bold font-mono text-indigo-700">$${Number(p.precio).toFixed(2)}</td>
+                <td class="p-2.5 text-center font-mono">${badgeStock}</td>
+                <td class="p-2.5 text-center">${badgeEstado}</td>
+                <td class="p-2.5 text-right space-x-1">
+                    <button onclick="ajustarStockProductoPos(${p.id}, ${p.stock})"
+                            class="text-xs text-amber-700 hover:text-amber-900 font-semibold px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition" title="Ajustar Stock">
+                        <i class="fa-solid fa-boxes-packing me-1"></i>Stock
+                    </button>
+                    <button onclick="cargarParaEditarProductoPos(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio}, ${p.stock})"
+                            class="text-xs text-blue-700 hover:text-blue-900 font-semibold px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 transition" title="Editar">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    ${btnEstado}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">Error al cargar productos del inventario.</td></tr>';
+    }
+}
+
+async function manejarGuardarProductoPos(e) {
+    e.preventDefault();
+    const msg = document.getElementById('modal-producto-mensaje');
+    const idInput = document.getElementById('pos-producto-id');
+    const id = idInput ? idInput.value : '';
+
+    const nombre = document.getElementById('pos-producto-nombre').value.trim();
+    const precio = parseFloat(document.getElementById('pos-producto-precio').value);
+    const stock = parseInt(document.getElementById('pos-producto-stock').value, 10);
+
+    if (!nombre || isNaN(precio) || precio < 0 || isNaN(stock) || stock < 0) {
+        if (msg) {
+            msg.className = 'text-xs p-2 rounded text-center font-medium bg-red-100 text-red-700 block';
+            msg.innerText = 'Completa los campos con valores numéricos válidos.';
+        }
+        return;
+    }
+
+    try {
+        if (id) {
+            await ApiService.actualizarProductoPos(id, { nombre, precio, stock });
+            if (msg) {
+                msg.className = 'text-xs p-2 rounded text-center font-medium bg-green-100 text-green-700 block';
+                msg.innerText = 'Producto actualizado exitosamente.';
+            }
+        } else {
+            await ApiService.crearProductoPos({ nombre, precio, stock, activo: true });
+            if (msg) {
+                msg.className = 'text-xs p-2 rounded text-center font-medium bg-green-100 text-green-700 block';
+                msg.innerText = 'Producto registrado exitosamente en el catálogo.';
+            }
+        }
+
+        setTimeout(() => { if (msg) msg.classList.add('hidden'); }, 2500);
+
+        document.getElementById('form-crear-producto-pos').reset();
+        if (idInput) idInput.value = '';
+        const titulo = document.getElementById('pos-form-titulo');
+        if (titulo) titulo.innerText = 'Nuevo Producto';
+
+        await cargarTablaInventarioPos();
+        await cargarCatalogoPos();
+    } catch (err) {
+        if (msg) {
+            msg.className = 'text-xs p-2 rounded text-center font-medium bg-red-100 text-red-700 block';
+            msg.innerText = `Error: ${err.message}`;
+        }
+    }
+}
+
+function cargarParaEditarProductoPos(id, nombre, precio, stock) {
+    const idInput = document.getElementById('pos-producto-id');
+    const inputNombre = document.getElementById('pos-producto-nombre');
+    const inputPrecio = document.getElementById('pos-producto-precio');
+    const inputStock = document.getElementById('pos-producto-stock');
+    const titulo = document.getElementById('pos-form-titulo');
+
+    if (idInput) idInput.value = id;
+    if (inputNombre) inputNombre.value = nombre;
+    if (inputPrecio) inputPrecio.value = precio;
+    if (inputStock) inputStock.value = stock;
+    if (titulo) titulo.innerText = `Editar Producto #${id}`;
+    if (inputNombre) inputNombre.focus();
+}
+
+async function cambiarEstadoProductoPos(id, nuevoEstado) {
+    const accion = nuevoEstado ? 'activar' : 'desactivar';
+    if (!confirm(`¿Estás seguro de que deseas ${accion} este producto?`)) return;
+
+    try {
+        await ApiService.cambiarEstadoProductoPos(id, nuevoEstado);
+        await cargarTablaInventarioPos();
+        await cargarCatalogoPos();
+    } catch (err) {
+        alert(`Error al cambiar estado del producto: ${err.message}`);
+    }
+}
+
+async function ajustarStockProductoPos(id, stockActual) {
+    const nuevoStockStr = prompt(`Ingresa la nueva cantidad en inventario para este producto:`, stockActual);
+    if (nuevoStockStr === null) return;
+
+    const nuevoStock = parseInt(nuevoStockStr, 10);
+    if (isNaN(nuevoStock) || nuevoStock < 0) {
+        alert('Por favor ingresa un número entero mayor o igual a 0.');
+        return;
+    }
+
+    try {
+        await ApiService.actualizarStockProductoPos(id, nuevoStock);
+        await cargarTablaInventarioPos();
+        await cargarCatalogoPos();
+    } catch (err) {
+        alert(`Error al actualizar stock: ${err.message}`);
+    }
+}
+
+// ==========================================
+// SECCIÓN HISTORIAL DE VENTAS Y MÉTRICAS FINANCIERAS
+// ==========================================
+async function cargarHistorialYResumenVentas() {
+    await Promise.allSettled([
+        cargarResumenVentas(),
+        cargarHistorialVentas(filtroTipoVentasActual)
+    ]);
+}
+
+async function cargarResumenVentas() {
+    try {
+        const resumen = await ApiService.getResumenVentas();
+        if (!resumen) return;
+
+        const formato = (val) => `$${Number(val || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        const setTxt = (id, txt) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = txt;
+        };
+
+        setTxt('kpi-ventas-hoy', formato(resumen.totalVendidoHoy));
+        setTxt('kpi-ventas-mes', formato(resumen.totalVendidoMes));
+        setTxt('kpi-membresias-hoy', formato(resumen.totalMembresiasHoy));
+        setTxt('kpi-productos-hoy', formato(resumen.totalProductosHoy));
+        setTxt('kpi-membresias-mes', formato(resumen.totalMembresiasMes));
+        setTxt('kpi-productos-mes', formato(resumen.totalProductosMes));
+        setTxt('kpi-total-pos-mes', formato(resumen.totalProductosMes));
+
+        setTxt('kpi-badge-transacciones-hoy', `${resumen.transaccionesHoy || 0} transacción${resumen.transaccionesHoy === 1 ? '' : 'es'}`);
+        setTxt('kpi-badge-transacciones-mes', `${resumen.transaccionesMes || 0} transacción${resumen.transaccionesMes === 1 ? '' : 'es'}`);
+    } catch (err) {
+        console.error('Error al cargar resumen de ventas:', err);
+    }
+}
+
+async function cargarHistorialVentas(tipo = 'TODOS') {
+    const tbody = document.getElementById('tabla-historial-ventas-body');
+    if (!tbody) return;
+
+    try {
+        filtroTipoVentasActual = tipo;
+        const transacciones = await ApiService.getHistorialVentas(tipo);
+        historialVentasCache = transacciones || [];
+
+        const inputBuscar = document.getElementById('input-buscar-historial-ventas');
+        const query = inputBuscar ? inputBuscar.value.trim() : '';
+        if (query) {
+            buscarEnHistorialVentas(query);
+        } else {
+            renderizarTablaHistorialVentas(historialVentasCache);
+        }
+    } catch (err) {
+        console.error('Error al cargar historial de ventas:', err);
+        tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-red-500">Error al cargar historial de ventas.</td></tr>';
+    }
+}
+
+function filtrarHistorialVentasPorTipo(tipo) {
+    filtroTipoVentasActual = tipo;
+
+    const btnTodos = document.getElementById('btn-filtro-tipo-todos');
+    const btnMem = document.getElementById('btn-filtro-tipo-membresia');
+    const btnProd = document.getElementById('btn-filtro-tipo-producto');
+
+    const activo = 'px-3 py-1.5 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow-sm';
+    const inactivo = 'px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-100 hover:bg-gray-200 text-gray-700';
+
+    if (btnTodos) btnTodos.className = tipo === 'TODOS' ? activo : inactivo;
+    if (btnMem) btnMem.className = tipo === 'MEMBRESIA' ? 'px-3 py-1.5 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow-sm' : inactivo;
+    if (btnProd) btnProd.className = tipo === 'PRODUCTO' ? 'px-3 py-1.5 rounded-xl text-xs font-bold transition bg-amber-600 text-white shadow-sm' : inactivo;
+
+    cargarHistorialVentas(tipo);
+}
+
+function buscarEnHistorialVentas(query = '') {
+    if (!historialVentasCache) return;
+    const q = query.toLowerCase().trim();
+    if (!q) {
+        renderizarTablaHistorialVentas(historialVentasCache);
+        return;
+    }
+
+    const filtradas = historialVentasCache.filter(t => {
+        const concepto = (t.concepto || '').toLowerCase();
+        const folio = (t.folio || '').toLowerCase();
+        const cliente = (t.clienteOSocio || '').toLowerCase();
+        const metodo = (t.metodoPago || '').toLowerCase();
+        const tipo = (t.tipoEtiqueta || '').toLowerCase();
+        return concepto.includes(q) || folio.includes(q) || cliente.includes(q) || metodo.includes(q) || tipo.includes(q);
+    });
+
+    renderizarTablaHistorialVentas(filtradas);
+}
+
+function renderizarTablaHistorialVentas(lista) {
+    const tbody = document.getElementById('tabla-historial-ventas-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-gray-400">No se encontraron transacciones en este periodo o filtro.</td></tr>';
+        return;
+    }
+
+    const formato = (val) => `$${Number(val || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    lista.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50 border-b border-gray-100 transition';
+
+        const esMembresia = t.tipo === 'MEMBRESIA';
+        const badgeTipo = esMembresia
+            ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1 w-fit"><i class="fa-solid fa-id-card"></i> Membresía</span>'
+            : '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1 w-fit"><i class="fa-solid fa-cart-shopping"></i> Mostrador POS</span>';
+
+        const metodoUpper = (t.metodoPago || 'EFECTIVO').toUpperCase();
+        let badgeMetodo = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Efectivo</span>';
+        if (metodoUpper.includes('TARJETA')) {
+            badgeMetodo = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">Tarjeta</span>';
+        } else if (metodoUpper.includes('TRANS')) {
+            badgeMetodo = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Transferencia</span>';
+        }
+
+        const fechaTxt = t.fechaHoraTexto || (t.fechaHora ? new Date(t.fechaHora).toLocaleString('es-MX') : '---');
+
+        tr.innerHTML = `
+            <td class="p-3 font-mono font-bold text-gray-600">${t.folio || '#' + t.id}</td>
+            <td class="p-3 font-mono text-gray-600 whitespace-nowrap">${fechaTxt}</td>
+            <td class="p-3">${badgeTipo}</td>
+            <td class="p-3 font-medium text-gray-900 max-w-xs">${t.concepto}</td>
+            <td class="p-3 text-gray-600">
+                <span class="font-semibold text-gray-800 block">${t.clienteOSocio}</span>
+                <span class="text-[11px] text-gray-400">Atendió: ${t.usuarioResponsable || 'Caja'}</span>
+            </td>
+            <td class="p-3">${badgeMetodo}</td>
+            <td class="p-3 text-right font-mono font-black text-sm text-gray-900">${formato(t.monto)}</td>
+        `;
+        tbody.appendChild(tr);
     });
 }

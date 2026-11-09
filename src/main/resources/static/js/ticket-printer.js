@@ -90,5 +90,47 @@ const TicketPrinter = {
         window.print();
 
         setTimeout(() => document.body.classList.remove('imprimiendo-corte'), 2000);
+    },
+
+    imprimirVentaPos(datosVenta) {
+        document.body.classList.remove('imprimiendo-ticket', 'imprimiendo-corte');
+        document.body.classList.add('imprimiendo-pos');
+
+        const setTxt = (id, txt) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = txt;
+        };
+
+        const formato = (val) => `$${Number(val || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        setTxt('tpos-folio', datosVenta.folio || datosVenta.id || '---');
+        setTxt('tpos-fecha', datosVenta.fechaHora ? new Date(datosVenta.fechaHora).toLocaleString('es-MX') : new Date().toLocaleString('es-MX'));
+        setTxt('tpos-responsable', datosVenta.usuarioResponsable || 'Recepcionista');
+        setTxt('tpos-metodo', (datosVenta.metodoPago || 'Efectivo').toUpperCase());
+        setTxt('tpos-total', formato(datosVenta.total));
+
+        const tbody = document.getElementById('tpos-tabla-items');
+        if (tbody) {
+            tbody.innerHTML = '';
+            const items = datosVenta.detalles || datosVenta.items || [];
+            items.forEach(it => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${it.cantidad}x ${it.productoNombre}</td>
+                    <td style="text-align: right;">${formato(it.subtotal)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        const cleanup = () => {
+            document.body.classList.remove('imprimiendo-pos');
+            window.removeEventListener('afterprint', cleanup);
+        };
+        window.addEventListener('afterprint', cleanup);
+
+        window.print();
+
+        setTimeout(() => document.body.classList.remove('imprimiendo-pos'), 2000);
     }
 };

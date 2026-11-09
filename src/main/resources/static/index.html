@@ -26,6 +26,10 @@
                 class="w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 bg-indigo-800 text-white shadow-sm transition">
             <i class="fa-solid fa-chart-pie w-5"></i> Dashboard y Analíticas
         </button>
+        <button data-section="pos" id="btn-nav-pos"
+                class="w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 hover:bg-indigo-800/60 text-indigo-200 hover:text-white transition">
+            <i class="fa-solid fa-cart-shopping w-5 text-amber-400"></i> Punto de Venta (POS)
+        </button>
         <button data-section="pagos" id="btn-nav-pagos"
                 class="w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 hover:bg-indigo-800/60 text-indigo-200 hover:text-white transition">
             <i class="fa-solid fa-cash-register w-5 text-emerald-400"></i> Cobros y Membresías
@@ -33,6 +37,10 @@
         <button data-section="corte" id="btn-nav-corte"
                 class="w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 hover:bg-indigo-800/60 text-indigo-200 hover:text-white transition">
             <i class="fa-solid fa-calculator w-5 text-sky-400"></i> Corte de Caja (Arqueo)
+        </button>
+        <button data-section="historial" id="btn-nav-historial"
+                class="w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 hover:bg-indigo-800/60 text-indigo-200 hover:text-white transition">
+            <i class="fa-solid fa-file-invoice-dollar w-5 text-teal-400"></i> Historial de Ventas
         </button>
         <button data-section="registro" id="btn-nav-registro"
                 class="w-full text-left px-4 py-3 rounded-xl font-medium text-sm flex items-center gap-3 hover:bg-indigo-800/60 text-indigo-200 hover:text-white transition">
@@ -56,6 +64,9 @@
     <header class="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm">
         <h2 id="titulo-seccion" class="text-xl font-bold text-gray-800">Panel General</h2>
         <div class="flex items-center gap-3">
+            <button id="btn-abrir-modal-inventario" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg font-semibold transition border border-amber-200 flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-boxes-stacked text-amber-600"></i> Inventario POS
+            </button>
             <button id="btn-abrir-modal-planes" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-semibold transition border border-indigo-200 flex items-center gap-1.5 shadow-sm">
                 <i class="fa-solid fa-tags text-indigo-500"></i> Gestionar Planes
             </button>
@@ -223,6 +234,153 @@
                     </div>
                 </div>
             </section>
+        </div>
+
+        <!-- SECCIÓN PUNTO DE VENTA (POS) E INVENTARIO -->
+        <div id="vista-pos" class="hidden space-y-6">
+            <!-- Header POS -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+                <div>
+                    <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fa-solid fa-cart-shopping text-amber-500"></i> Punto de Venta (POS) - Mostrador Gym QA
+                    </h3>
+                    <p class="text-xs text-gray-500">Venta rápida de bebidas, suplementos y accesorios con control automático de stock en mostrador</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/api/v1/reportes/descargar-pdf-mostrador" target="_blank"
+                       class="text-xs bg-white hover:bg-red-50 text-red-700 hover:text-red-800 px-3 py-2 rounded-xl font-semibold border border-red-200 transition flex items-center gap-1.5 shadow-sm" title="Descargar Reporte Mensual PDF de Mostrador">
+                        <i class="fa-solid fa-file-pdf text-red-600"></i> Reporte Mensual PDF
+                    </a>
+                    <button onclick="abrirModalInventarioPos()"
+                            class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 px-3.5 py-2 rounded-xl font-semibold border border-amber-200 transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-boxes-stacked text-amber-600"></i> Administrar Inventario
+                    </button>
+                    <button onclick="cargarCatalogoPos()"
+                            class="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-xl font-semibold border border-gray-200 transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-rotate"></i> Refrescar
+                    </button>
+                </div>
+            </div>
+
+            <!-- CUADRÍCULA POS: CATÁLOGO IZQUIERDA (7 cols) + TICKET/CARRITO DERECHA (5 cols) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Columna Izquierda: Botonera / Cuadrícula de Productos -->
+                <div class="lg:col-span-7 xl:col-span-8 space-y-4">
+                    <!-- Barra de Búsqueda Rápida de Productos -->
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between gap-3">
+                        <div class="relative flex-grow">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                            <input type="text" id="pos-buscar-producto" placeholder="Buscar por nombre (ej. Agua, Monster, Proteína)..."
+                                   class="w-full pl-9 pr-4 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+                        </div>
+                        <span id="pos-contador-productos" class="text-xs font-mono font-bold text-gray-500 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100 flex-shrink-0">
+                            0 productos
+                        </span>
+                    </div>
+
+                    <!-- Cuadrícula de Productos -->
+                    <div id="pos-catalogo-grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                        <div class="col-span-full p-8 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
+                            <i class="fa-solid fa-spinner fa-spin text-2xl text-amber-500 mb-2"></i>
+                            <p class="text-xs">Cargando catálogo de productos...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Ticket de Venta / Carrito -->
+                <div class="lg:col-span-5 xl:col-span-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col justify-between sticky top-6 space-y-4">
+                        <!-- Cabecera del Carrito -->
+                        <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-sm">
+                                    <i class="fa-solid fa-receipt"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-bold text-gray-800">Ticket de Venta</h4>
+                                    <span id="pos-cart-badge-items" class="text-[11px] text-gray-400 font-medium">0 ítems agregados</span>
+                                </div>
+                            </div>
+                            <button onclick="vaciarCarritoPos()" title="Vaciar Carrito"
+                                    class="text-xs text-gray-400 hover:text-red-600 font-medium transition px-2 py-1 rounded hover:bg-red-50">
+                                <i class="fa-solid fa-trash-can me-1"></i> Vaciar
+                            </button>
+                        </div>
+
+                        <!-- Lista de Ítems en Carrito -->
+                        <div id="pos-cart-items-container" class="max-h-72 overflow-y-auto divide-y divide-gray-100 pr-1">
+                            <div class="py-8 text-center text-gray-400">
+                                <i class="fa-solid fa-cart-arrow-down text-3xl text-gray-300 mb-2"></i>
+                                <p class="text-xs font-medium">El carrito está vacío</p>
+                                <p class="text-[11px] text-gray-400 mt-0.5">Toca o haz clic en cualquier producto para agregarlo al ticket</p>
+                            </div>
+                        </div>
+
+                        <!-- Resumen y Forma de Pago -->
+                        <div class="space-y-3 pt-3 border-t border-gray-100">
+                            <!-- Métodos de Pago -->
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1.5">Método de Pago</label>
+                                <div class="grid grid-cols-3 gap-2" id="pos-metodos-pago-group">
+                                    <button type="button" onclick="seleccionarMetodoPagoPos('Efectivo')" id="pos-btn-metodo-efectivo"
+                                            class="p-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition bg-emerald-50 border-emerald-400 text-emerald-800 shadow-sm">
+                                        <i class="fa-solid fa-money-bill-wave"></i> Efectivo
+                                    </button>
+                                    <button type="button" onclick="seleccionarMetodoPagoPos('Tarjeta')" id="pos-btn-metodo-tarjeta"
+                                            class="p-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100">
+                                        <i class="fa-solid fa-credit-card"></i> Tarjeta
+                                    </button>
+                                    <button type="button" onclick="seleccionarMetodoPagoPos('Transferencia')" id="pos-btn-metodo-transferencia"
+                                            class="p-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100">
+                                        <i class="fa-solid fa-mobile-screen-button"></i> Transf.
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Cálculo de Cambio si es Efectivo -->
+                            <div id="pos-seccion-cambio-efectivo" class="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-gray-600 font-medium">Efectivo Recibido:</span>
+                                    <div class="relative w-28">
+                                        <span class="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-bold">$</span>
+                                        <input type="number" step="0.50" min="0" id="pos-input-efectivo-recibido" placeholder="0.00"
+                                               class="w-full pl-5 pr-2 py-1 text-right border rounded-lg text-xs font-mono font-bold focus:ring-1 focus:ring-emerald-500 bg-white">
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-gray-600 font-medium">Cambio a Entregar:</span>
+                                    <span id="pos-display-cambio" class="font-mono font-black text-emerald-700 text-sm">$0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Campo Responsable -->
+                            <div class="flex items-center justify-between gap-2 text-xs">
+                                <label class="text-gray-500 text-[11px] font-medium">Atendió:</label>
+                                <input type="text" id="pos-usuario-responsable" value="Recepcionista Turno"
+                                       class="p-1.5 border rounded-lg text-xs text-right w-44 font-medium text-gray-700">
+                            </div>
+
+                            <!-- Total Grande -->
+                            <div class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl flex justify-between items-center">
+                                <div>
+                                    <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Total a Cobrar</span>
+                                    <span class="text-[11px] text-gray-500" id="pos-resumen-cant-articulos">0 artículos</span>
+                                </div>
+                                <span id="pos-total-display" class="text-3xl font-black text-amber-900 font-mono">$0.00</span>
+                            </div>
+
+                            <!-- Botón Cobrar -->
+                            <button type="button" id="btn-finalizar-venta-pos" onclick="finalizarVentaPos()"
+                                    class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-sm hover:shadow transition flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fa-solid fa-circle-check text-base"></i> Cobrar / Finalizar Venta
+                            </button>
+
+                            <!-- Mensaje de Feedback -->
+                            <div id="pos-mensaje-venta" class="hidden text-xs p-2.5 rounded-lg text-center font-medium"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- 2. SECCIÓN COBROS Y GESTIÓN DE SOCIOS -->
@@ -523,6 +681,131 @@
             </div>
         </div>
 
+        <!-- SECCIÓN HISTORIAL DE VENTAS Y RESUMEN FINANCIERO -->
+        <div id="vista-historial" class="hidden space-y-6">
+            <!-- Header con botón refrescar -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+                <div>
+                    <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar text-teal-600"></i> Historial de Ventas y Resumen Financiero
+                    </h3>
+                    <p class="text-xs text-gray-500">Consulta centralizada de transacciones (membresías cobradas y productos de mostrador POS)</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/api/v1/reportes/descargar-pdf-mostrador" target="_blank"
+                       class="text-xs bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-xl font-semibold transition flex items-center gap-2 shadow-sm" title="Descargar o visualizar el reporte mensual de ventas en mostrador">
+                        <i class="fa-solid fa-file-pdf"></i> Reporte PDF Mostrador
+                    </a>
+                    <button id="btn-refrescar-historial-ventas" onclick="cargarHistorialYResumenVentas()"
+                            class="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl font-semibold border border-gray-200 transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-rotate"></i> Actualizar Métricas
+                    </button>
+                </div>
+            </div>
+
+            <!-- TARJETAS DE RESUMEN (KPI CARDS: HOY VS MES) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Tarjeta 1: Ventas de Hoy -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-emerald-500 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-calendar-day"></i> Ventas de Hoy
+                        </p>
+                        <span id="kpi-badge-transacciones-hoy" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            0 transacciones
+                        </span>
+                    </div>
+                    <h3 id="kpi-ventas-hoy" class="text-3xl font-black text-gray-900 font-mono my-1">$0.00</h3>
+                    <div class="pt-3 border-t border-gray-100 mt-2 flex justify-between text-[11px] text-gray-500">
+                        <span>Membresías: <strong id="kpi-membresias-hoy" class="text-emerald-700 font-mono">$0.00</strong></span>
+                        <span>POS: <strong id="kpi-productos-hoy" class="text-amber-700 font-mono">$0.00</strong></span>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 2: Ventas del Mes -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-indigo-600 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-calendar-check"></i> Ventas del Mes
+                        </p>
+                        <span id="kpi-badge-transacciones-mes" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            0 transacciones
+                        </span>
+                    </div>
+                    <h3 id="kpi-ventas-mes" class="text-3xl font-black text-indigo-700 font-mono my-1">$0.00</h3>
+                    <div class="pt-3 border-t border-gray-100 mt-2 flex justify-between text-[11px] text-gray-500">
+                        <span>Membresías: <strong id="kpi-membresias-mes" class="text-indigo-800 font-mono">$0.00</strong></span>
+                        <span>POS: <strong id="kpi-productos-mes" class="text-amber-700 font-mono">$0.00</strong></span>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 3: Facturación POS Tienda Mostrador -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-amber-500 flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-cart-shopping"></i> Mostrador POS (Mes)
+                        </p>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                            Bebidas & Suplementos
+                        </span>
+                    </div>
+                    <h3 id="kpi-total-pos-mes" class="text-3xl font-black text-amber-800 font-mono my-1">$0.00</h3>
+                    <p class="text-[11px] text-gray-400 pt-3 border-t border-gray-100 mt-2 flex items-center gap-1">
+                        <i class="fa-solid fa-boxes-stacked text-amber-500"></i> Ingresos generados por la venta de productos
+                    </p>
+                </div>
+            </div>
+
+            <!-- TABLA DE HISTORIAL DE TRANSACCIONES -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <!-- Filtros por tipo de venta -->
+                    <div class="flex items-center gap-2 flex-wrap" id="grupo-filtros-ventas">
+                        <button type="button" onclick="filtrarHistorialVentasPorTipo('TODOS')" id="btn-filtro-tipo-todos"
+                                class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow-sm">
+                            Todas
+                        </button>
+                        <button type="button" onclick="filtrarHistorialVentasPorTipo('MEMBRESIA')" id="btn-filtro-tipo-membresia"
+                                class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-100 hover:bg-gray-200 text-gray-700">
+                            Membresías
+                        </button>
+                        <button type="button" onclick="filtrarHistorialVentasPorTipo('PRODUCTO')" id="btn-filtro-tipo-producto"
+                                class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-100 hover:bg-gray-200 text-gray-700">
+                            Productos POS
+                        </button>
+                    </div>
+
+                    <!-- Buscador rápido en tabla -->
+                    <div class="relative w-full sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                        <input type="text" id="input-buscar-historial-ventas" oninput="buscarEnHistorialVentas(this.value)"
+                               placeholder="Filtrar por socio, concepto, folio..."
+                               class="w-full pl-8 pr-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <!-- Tabla de Ventas -->
+                <div class="overflow-x-auto border border-gray-100 rounded-xl">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-gray-50 border-b text-gray-500 uppercase font-semibold">
+                            <tr>
+                                <th class="p-3">Folio</th>
+                                <th class="p-3">Fecha y Hora</th>
+                                <th class="p-3">Tipo</th>
+                                <th class="p-3">Concepto</th>
+                                <th class="p-3">Cliente / Atendió</th>
+                                <th class="p-3">Método de Pago</th>
+                                <th class="p-3 text-right">Monto Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial-ventas-body" class="divide-y divide-gray-100">
+                            <tr><td colspan="7" class="p-4 text-center text-gray-400">Cargando transacciones financieras...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- 4. SECCIÓN ALTA DE NUEVO SOCIO -->
         <div id="vista-registro" class="hidden space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
@@ -757,6 +1040,84 @@
     </div>
 </div>
 
+<!-- MODAL GESTIÓN CRUD DE INVENTARIO Y PRODUCTOS POS -->
+<div id="modal-inventario-pos" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto space-y-6">
+        <div class="flex justify-between items-center pb-3 border-b border-gray-100">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-boxes-stacked text-amber-600"></i> Inventario y Catálogo de Productos
+                </h3>
+                <p class="text-xs text-gray-500">Agrega nuevos productos al mostrador, ajusta existencias o activa/inactiva artículos</p>
+            </div>
+            <button onclick="cerrarModalInventarioPos()" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg transition text-sm">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Formulario Crear / Editar Producto -->
+        <form id="form-crear-producto-pos" class="space-y-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200/80">
+            <h4 class="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-plus"></i> <span id="pos-form-titulo">Nuevo Producto</span>
+            </h4>
+            <input type="hidden" id="pos-producto-id" value="">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Nombre del Producto</label>
+                    <input type="text" id="pos-producto-nombre" required placeholder="Ej: Bebida Monster 473ml, Proteína por porción"
+                           class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-amber-500 bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Precio de Venta ($)</label>
+                    <input type="number" step="0.50" min="0" id="pos-producto-precio" required placeholder="35.00"
+                           class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-amber-500 bg-white font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Stock Inicial / Actual</label>
+                    <input type="number" min="0" id="pos-producto-stock" required value="10"
+                           class="w-full p-2 border rounded-lg text-xs focus:ring-2 focus:ring-amber-500 bg-white font-mono">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" id="pos-btn-guardar-producto"
+                            class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 rounded-lg transition text-xs flex items-center justify-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Producto
+                    </button>
+                </div>
+            </div>
+            <div id="modal-producto-mensaje" class="hidden text-xs p-2 rounded text-center font-medium"></div>
+        </form>
+
+        <!-- Tabla de Productos Registrados -->
+        <div>
+            <div class="flex justify-between items-center mb-2">
+                <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-clipboard-list text-amber-600"></i> Existencias en Almacén / Mostrador
+                </h4>
+                <button type="button" onclick="cargarTablaInventarioPos()" class="text-xs text-amber-700 hover:text-amber-900 font-medium">
+                    <i class="fa-solid fa-rotate me-1"></i> Actualizar
+                </button>
+            </div>
+            <div class="overflow-x-auto border border-gray-100 rounded-xl">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-gray-50 border-b text-gray-500 uppercase font-semibold">
+                        <tr>
+                            <th class="p-2.5">ID</th>
+                            <th class="p-2.5">Producto</th>
+                            <th class="p-2.5 font-mono">Precio</th>
+                            <th class="p-2.5 font-mono text-center">Stock</th>
+                            <th class="p-2.5 text-center">Estado</th>
+                            <th class="p-2.5 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-modal-inventario-body" class="divide-y divide-gray-100">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-400">Cargando inventario...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- CONTENEDOR OCULTO PARA EL TICKET TÉRMICO DE PAGO -->
 <div id="ticket-impresion" class="hidden">
     <div class="ticket-container">
@@ -848,6 +1209,47 @@
             <p>_________________________________</p>
             <p>Firma del Responsable</p>
             <p style="font-size: 9px; margin-top: 5px;">Sistema Gym QA v1.2</p>
+        </div>
+    </div>
+</div>
+
+<!-- CONTENEDOR OCULTO PARA IMPRESIÓN DE TICKET DE VENTA POS -->
+<div id="ticket-pos-impresion" class="hidden">
+    <div class="ticket-container">
+        <div class="ticket-header">
+            <h2>CONTROL GYM QA</h2>
+            <p><strong>TIENDA / MOSTRADOR POS</strong></p>
+            <p>Sucursal Principal - Teziutlán, Puebla</p>
+        </div>
+        <div class="ticket-divider">================================</div>
+        <div class="ticket-info">
+            <p><strong>Ticket Venta:</strong> #<span id="tpos-folio">---</span></p>
+            <p><strong>Fecha/Hora:</strong> <span id="tpos-fecha">---</span></p>
+            <p><strong>Atendió:</strong> <span id="tpos-responsable">---</span></p>
+            <p><strong>Método de Pago:</strong> <span id="tpos-metodo">EFECTIVO</span></p>
+        </div>
+        <div class="ticket-divider">--------------------------------</div>
+        <p style="text-align: center; font-weight: bold; margin-bottom: 3px;">DETALLE DE COMPRA</p>
+        <table class="ticket-table">
+            <thead>
+                <tr><th>Cant. Descripción</th><th style="text-align: right;">Subtotal</th></tr>
+            </thead>
+            <tbody id="tpos-tabla-items"></tbody>
+        </table>
+        <div class="ticket-divider">================================</div>
+        <table class="ticket-table" style="font-weight: bold; font-size: 13px;">
+            <tbody>
+                <tr>
+                    <td>TOTAL COBRADO:</td>
+                    <td style="text-align: right;" id="tpos-total">$0.00</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="ticket-divider">--------------------------------</div>
+        <div class="ticket-footer">
+            <p>¡Gracias por tu compra!</p>
+            <p>Conserva este ticket para cualquier aclaración</p>
+            <p style="font-size: 9px; margin-top: 4px;">Control Gym QA - Módulo POS</p>
         </div>
     </div>
 </div>

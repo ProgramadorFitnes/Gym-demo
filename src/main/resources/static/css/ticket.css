@@ -43,6 +43,26 @@
         margin: 0;
     }
 
+    /* Impresión de Ticket de Venta POS (Productos / Tienda) */
+    body.imprimiendo-pos #ticket-pos-impresion,
+    body.imprimiendo-pos #ticket-pos-impresion * {
+        visibility: visible !important;
+    }
+    body.imprimiendo-pos #ticket-pos-impresion {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 72mm;
+        display: block !important;
+        background: white;
+        color: black;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 11px;
+        line-height: 1.2;
+        padding: 2mm;
+        margin: 0;
+    }
+
     .ticket-container { width: 100%; }
     .ticket-header, .ticket-footer { text-align: center; }
     .ticket-divider { text-align: center; letter-spacing: -1px; margin: 4px 0; }

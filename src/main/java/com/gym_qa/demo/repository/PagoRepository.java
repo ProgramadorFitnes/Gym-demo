@@ -19,5 +19,7 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 
     List<Pago> findByFechaPago(LocalDate fechaPago);
 
+    List<Pago> findAllByOrderByIdDesc();
+
     List<Pago> findByUsuarioIdOrderByFechaPagoAscIdAsc(Long usuarioId);
 }
